@@ -19,11 +19,13 @@ return [
     'allowed_methods' => ['*'],
 
     'allowed_origins' => [
-        'https://eclectic-chebakia-83eb9e.netlify.app',
-        '*',
+        'https://phuc-mobile-frontend.vercel.app',
+        'http://localhost:5173',
+        'http://localhost:3000',
     ],
 
     'allowed_origins_patterns' => [
+        '/^https:\/\/.*\.vercel\.app$/',
         '/^https:\/\/.*\.onrender\.com$/',
     ],
 
@@ -33,5 +35,5 @@ return [
 
     'max_age' => 0,
 
-    'supports_credentials' => false,
+    'supports_credentials' => true,
 ];
