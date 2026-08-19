@@ -50,4 +50,16 @@ class Product extends Model
         return $this->hasMany(\App\Models\ProductImage::class)->orderBy('sort_order', 'asc');
     }
 
+    public function reviews()
+    {
+        return $this->hasMany(\App\Models\Review::class);
+    }
+
+    public function getStockQuantityAttribute($value)
+    {
+        if ($this->relationLoaded('variants') && $this->variants && $this->variants->count() > 0) {
+            return (int) $this->variants->sum('stock_quantity');
+        }
+        return (int) ($value ?? 0);
+    }
 }

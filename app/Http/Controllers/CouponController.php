@@ -7,24 +7,6 @@ use App\Services\DiscountService;
 use Illuminate\Http\Request;
 use Exception;
 
-/**
- * @OA\Schema(
- *     schema="Coupon",
- *     title="Coupon",
- *     required={"code", "type", "value", "start_date", "end_date"},
- *     @OA\Property(property="id", type="integer", example=1),
- *     @OA\Property(property="code", type="string", example="SUMMER2024"),
- *     @OA\Property(property="type", type="string", enum={"percent", "fixed"}, example="percent"),
- *     @OA\Property(property="value", type="number", format="float", example=10.5),
- *     @OA\Property(property="min_order_amount", type="number", format="float", nullable=true, example=100000),
- *     @OA\Property(property="max_discount", type="number", format="float", nullable=true, example=50000),
- *     @OA\Property(property="usage_limit", type="integer", nullable=true, example=100),
- *     @OA\Property(property="used_count", type="integer", example=0),
- *     @OA\Property(property="start_date", type="string", format="date", example="2024-01-01"),
- *     @OA\Property(property="end_date", type="string", format="date", example="2024-12-31"),
- *     @OA\Property(property="is_active", type="boolean", example=true)
- * )
- */
 class CouponController extends Controller
 {
     protected $discountService;
@@ -35,13 +17,7 @@ class CouponController extends Controller
     }
 
     /**
-     * @OA\Get(
-     *     path="/admin/coupons",
-     *     summary="Danh sách mã giảm giá (Admin)",
-     *     tags={"Admin Coupons"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Response(response=200, description="Thành công", @OA\JsonContent(type="array", @OA\Items(ref="#/components/schemas/Coupon")))
-     * )
+     * Lấy danh sách toàn bộ Mã giảm giá.
      */
     public function index()
     {
@@ -50,18 +26,8 @@ class CouponController extends Controller
     }
 
     /**
-     * @OA\Post(
-     *     path="/admin/coupons",
-     *     summary="Tạo mã giảm giá mới (Admin)",
-     *     tags={"Admin Coupons"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(ref="#/components/schemas/Coupon")
-     *     ),
-     *     @OA\Response(response=201, description="Tạo thành công", @OA\JsonContent(ref="#/components/schemas/Coupon")),
-     *     @OA\Response(response=422, description="Dữ liệu không hợp lệ")
-     * )
+     * Tạo Mã giảm giá mới (Chỉ Admin).
+     * Ràng buộc: Mã phải là duy nhất, ngày kết thúc phải sau ngày bắt đầu.
      */
     public function store(Request $request)
     {
@@ -82,15 +48,7 @@ class CouponController extends Controller
     }
 
     /**
-     * @OA\Get(
-     *     path="/admin/coupons/{id}",
-     *     summary="Xem chi tiết mã giảm giá (Admin)",
-     *     tags={"Admin Coupons"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer")),
-     *     @OA\Response(response=200, description="Thành công", @OA\JsonContent(ref="#/components/schemas/Coupon")),
-     *     @OA\Response(response=404, description="Không tìm thấy")
-     * )
+     * Lấy chi tiết 1 Mã giảm giá.
      */
     public function show(Coupon $coupon)
     {
@@ -98,19 +56,7 @@ class CouponController extends Controller
     }
 
     /**
-     * @OA\Put(
-     *     path="/admin/coupons/{id}",
-     *     summary="Cập nhật mã giảm giá (Admin)",
-     *     tags={"Admin Coupons"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer")),
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(ref="#/components/schemas/Coupon")
-     *     ),
-     *     @OA\Response(response=200, description="Cập nhật thành công", @OA\JsonContent(ref="#/components/schemas/Coupon")),
-     *     @OA\Response(response=404, description="Không tìm thấy")
-     * )
+     * Cập nhật Mã giảm giá (Chỉ Admin).
      */
     public function update(Request $request, Coupon $coupon)
     {
@@ -131,15 +77,7 @@ class CouponController extends Controller
     }
 
     /**
-     * @OA\Delete(
-     *     path="/admin/coupons/{id}",
-     *     summary="Xóa mã giảm giá (Admin)",
-     *     tags={"Admin Coupons"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer")),
-     *     @OA\Response(response=204, description="Xóa thành công"),
-     *     @OA\Response(response=404, description="Không tìm thấy")
-     * )
+     * Xóa Mã giảm giá.
      */
     public function destroy(Coupon $coupon)
     {
@@ -148,39 +86,8 @@ class CouponController extends Controller
     }
 
     /**
-     * @OA\Post(
-     *     path="/coupons/apply",
-     *     summary="Áp dụng mã giảm giá cho giỏ hàng (User)",
-     *     tags={"Coupons"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"code", "order_amount"},
-     *             @OA\Property(property="code", type="string", example="SUMMER2024"),
-     *             @OA\Property(property="order_amount", type="number", example=200000)
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=200, 
-     *         description="Thành công",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="coupon_code", type="string", example="SUMMER2024"),
-     *             @OA\Property(property="discount_amount", type="number", example=50000),
-     *             @OA\Property(property="final_amount", type="number", example=150000),
-     *             @OA\Property(property="message", type="string", example="Áp dụng mã giảm giá thành công.")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=422, 
-     *         description="Mã không hợp lệ hoặc không đủ điều kiện",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Mã giảm giá đã hết hạn.")
-     *         )
-     *     )
-     * )
+     * Người dùng Áp dụng Mã giảm giá lúc Checkout.
+     * Sử dụng DiscountService để kiểm tra logic: Hết hạn chưa? Đủ điều kiện đơn hàng tối thiểu không?
      */
     public function apply(Request $request)
     {

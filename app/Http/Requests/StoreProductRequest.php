@@ -42,13 +42,17 @@ class StoreProductRequest extends FormRequest
             'material' => 'nullable|string|max:100',
             'brand_id' => 'required|integer|exists:brands,id',
             'description' => 'nullable|string',
-            'stock_quantity' => 'required|integer|min:0',
-            // Rule quan trọng cho File ảnh
+            'stock_quantity' => 'nullable|integer|min:0',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:20480',
+            'image_url' => 'nullable|string',
             'gallery_images' => 'nullable|array|max:20',
             'gallery_images.*' => 'image|mimes:jpeg,png,jpg,webp|max:20480',
             'is_active' => 'boolean',
             'is_featured' => 'boolean',
+            'colors' => 'nullable|array',
+            'colors.*' => 'string',
+            'storages' => 'nullable|array',
+            'storages.*' => 'string',
         ];
     }
 

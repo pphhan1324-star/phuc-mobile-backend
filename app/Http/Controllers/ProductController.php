@@ -14,203 +14,29 @@ use Illuminate\Support\Facades\Storage;
 use Intervention\Image\ImageManager;
 use Intervention\Image\Drivers\Gd\Driver;
 
-/**
- * @OA\Schema(
- *     schema="Product",
- *     title="Product",
- *     description="Mô hình Sản phẩm",
- *     @OA\Property(property="id", type="integer", example=1, description="ID duy nhất của sản phẩm"),
- *     @OA\Property(property="category_id", type="integer", example=1, description="ID của danh mục thuộc về (ví dụ: Apple)"),
- *     @OA\Property(property="name", type="string", example="iPhone 15 Pro Max", description="Tên sản phẩm"),
- *     @OA\Property(property="slug", type="string", example="iphone-15-pro-max-123456", description="Đường dẫn thân thiện (unique)"),
- *     @OA\Property(property="sku", type="string", example="APP-SKU-001", description="Mã kho hàng (Stock Keeping Unit)"),
- *     @OA\Property(property="description", type="string", description="Mô tả chi tiết sản phẩm"),
- *     @OA\Property(property="screen_size", type="string", example="6.7 inches", description="Kích thước màn hình"),
- *     @OA\Property(property="screen_tech", type="string", example="Super Retina XDR OLED", description="Công nghệ màn hình"),
- *     @OA\Property(property="rear_camera", type="string", example="48MP + 12MP + 12MP", description="Thông số camera sau"),
- *     @OA\Property(property="front_camera", type="string", example="12MP", description="Thông số camera trước"),
- *     @OA\Property(property="chipset", type="string", example="Apple A17 Pro", description="Bộ xử lý CPU"),
- *     @OA\Property(property="battery", type="string", example="4441 mAh", description="Dung lượng pin"),
- *     @OA\Property(property="charging_speed", type="string", example="25W", description="Tốc độ sạc nhanh"),
- *     @OA\Property(property="operating_system", type="string", example="iOS 17", description="Hệ điều hành"),
- *     @OA\Property(property="weight_g", type="integer", example=221, description="Trọng lượng (gram)"),
- *     @OA\Property(property="brand", type="string", example="Apple", description="Thương hiệu"),
- *     @OA\Property(property="base_price", type="number", example=34990000, description="Giá gốc niêm yết"),
- *     @OA\Property(property="sale_price", type="number", nullable=true, example=32990000, description="Giá khuyến mãi (nếu có)"),
- *     @OA\Property(property="image_url", type="string", description="Đường dẫn ảnh chính"),
- *     @OA\Property(property="is_active", type="boolean", example=true, description="Trạng thái kinh doanh (hiện/ẩn)"),
- *     @OA\Property(property="is_featured", type="boolean", example=false, description="Sản phẩm nổi bật/xu hướng"),
- *     @OA\Property(property="category", ref="#/components/schemas/Category"),
- *     @OA\Property(property="variants", type="array", @OA\Items(ref="#/components/schemas/ProductVariant"))
- * )
- */
 class ProductController extends Controller
 {
     /**
-     * @OA\Get(
-     *     path="/products",
-     *     summary="Lấy danh sách sản phẩm",
-     *     description="API trả về danh sách sản phẩm có hỗ trợ tìm kiếm, lọc, sắp xếp và cursor-based pagination (infinite scrolling). 
-     *     Mặc định chỉ trả về sản phẩm đang hoạt động (is_active = true). 
-     *     Nếu truyền all=true thì trả về tất cả sản phẩm (dành cho admin).",
-     *     operationId="getProducts",
-     *     tags={"Products"},
-     *
-     *     @OA\Parameter(
-     *         name="category_id",
-     *         in="query",
-     *         description="ID danh mục sản phẩm. Hệ thống sẽ tự động lấy cả danh mục con.",
-     *         required=false,
-     *         @OA\Schema(type="integer", example=3)
-     *     ),
-     *
-     *     @OA\Parameter(
-     *         name="search",
-     *         in="query",
-     *         description="Tìm kiếm theo tên sản phẩm hoặc SKU",
-     *         required=false,
-     *         @OA\Schema(type="string", example="iphone")
-     *     ),
-     *
-     *     @OA\Parameter(
-     *         name="search",
-     *         in="query",
-     *         description="Tìm kiếm theo tên sản phẩm hoặc SKU",
-     *         required=false,
-     *         @OA\Schema(type="string", example="iphone")
-     *     ),
-     *     @OA\Parameter(
-     *         name="min_price",
-     *         in="query",
-     *         description="Lọc sản phẩm có giá >= giá trị này",
-     *         required=false,
-     *         @OA\Schema(type="number", format="float", example=1000000)
-     *     ),
-     *
-     *     @OA\Parameter(
-     *         name="max_price",
-     *         in="query",
-     *         description="Lọc sản phẩm có giá <= giá trị này",
-     *         required=false,
-     *         @OA\Schema(type="number", format="float", example=5000000)
-     *     ),
-     *
-     *     @OA\Parameter(
-     *         name="sort_by",
-     *         in="query",
-     *         description="Trường dùng để sắp xếp",
-     *         required=false,
-     *         @OA\Schema(
-     *             type="string",
-     *             enum={"base_price","name","created_at"},
-     *             default="created_at"
-     *         )
-     *     ),
-     *
-     *     @OA\Parameter(
-     *         name="sort_order",
-     *         in="query",
-     *         description="Thứ tự sắp xếp",
-     *         required=false,
-     *         @OA\Schema(
-     *             type="string",
-     *             enum={"asc","desc"},
-     *             default="desc"
-     *         )
-     *     ),
-     *
-     *     @OA\Parameter(
-     *         name="cursor",
-     *         in="query",
-     *         description="Cursor dùng cho cursor pagination để lấy trang tiếp theo",
-     *         required=false,
-     *         @OA\Schema(type="string")
-     *     ),
-     *
-     *     @OA\Parameter(
-     *         name="all",
-     *         in="query",
-     *         description="Nếu true thì trả về tất cả sản phẩm (bao gồm cả sản phẩm ẩn). Dành cho admin.",
-     *         required=false,
-     *         @OA\Schema(type="boolean", example=false)
-     *     ),
-     *
-     *     @OA\Response(
-     *         response=200,
-     *         description="Danh sách sản phẩm",
-     *         @OA\JsonContent(
-     *
-     *             @OA\Property(
-     *                 property="data",
-     *                 type="array",
-     *                 description="Danh sách sản phẩm",
-     *                 @OA\Items(ref="#/components/schemas/Product")
-     *             ),
-     *
-     *             @OA\Property(
-     *                 property="path",
-     *                 type="string",
-     *                 example="http://localhost/api/products"
-     *             ),
-     *
-     *             @OA\Property(
-     *                 property="per_page",
-     *                 type="integer",
-     *                 example=12,
-     *                 description="Số lượng sản phẩm mỗi trang"
-     *             ),
-     *
-     *             @OA\Property(
-     *                 property="next_cursor",
-     *                 type="string",
-     *                 nullable=true,
-     *                 example="eyJpZCI6MTJ9",
-     *                 description="Cursor cho trang tiếp theo"
-     *             ),
-     *
-     *             @OA\Property(
-     *                 property="next_page_url",
-     *                 type="string",
-     *                 nullable=true,
-     *                 example="http://localhost/api/products?cursor=eyJpZCI6MTJ9",
-     *                 description="URL trang tiếp theo"
-     *             ),
-     *
-     *             @OA\Property(
-     *                 property="prev_cursor",
-     *                 type="string",
-     *                 nullable=true,
-     *                 example=null,
-     *                 description="Cursor trang trước"
-     *             ),
-     *
-     *             @OA\Property(
-     *                 property="prev_page_url",
-     *                 type="string",
-     *                 nullable=true,
-     *                 example=null,
-     *                 description="URL trang trước"
-     *             )
-     *         )
-     *     ),
-     *
-     *     @OA\Response(
-     *         response=400,
-     *         description="Tham số không hợp lệ"
-     *     ),
-     *
-     *     @OA\Response(
-     *         response=500,
-     *         description="Lỗi server"
-     *     )
-     * )
+     * Lấy danh sách sản phẩm (có phân trang, tìm kiếm, lọc theo giá và danh mục).
+     * Dành cho cả Trang chủ (lấy sản phẩm đang bán) và Admin (lấy tất cả).
      */
     public function index(Request $request)
     {
         $query = Product::select([
             'id', 'category_id', 'brand_id', 'name', 'slug', 'sku', 'base_price', 'stock_quantity',
             'sale_price', 'image_url', 'is_active', 'is_featured', 'created_at'
-        ])->with(['category:id,name,slug', 'brand:id,name,logo,slug']);
+        ])->with([
+            'category:id,name,slug', 
+            'brand:id,name,logo,slug',
+            'specifications',
+            'variants.color',
+            'variants.ram',
+            'variants.storage'
+        ])->withCount(['reviews' => function($query) {
+            $query->where('status', 'approved');
+        }])->withAvg(['reviews' => function($query) {
+            $query->where('status', 'approved');
+        }], 'rating');
 
         // Admin gửi all=true -> không lọc is_active, trả hết
         // FE public mặc định chỉ hiển thị sản phẩm đang bán
@@ -252,7 +78,7 @@ class ProductController extends Controller
         // Admin: phân trang truyền thống (10 SP/trang), hiển thị cả SP ẩn
         if ($request->boolean('all')) {
             /** @var \Illuminate\Pagination\LengthAwarePaginator $products */
-            $products = $query->orderBy('id')->paginate(10);
+            $products = $query->orderBy('id')->paginate(100);
             $products->appends($request->only(['category_id', 'min_price', 'max_price', 'sort_by', 'sort_order', 'all']));
 
             return response()->json(array_merge(['success' => true], $products->toArray()));
@@ -269,21 +95,8 @@ class ProductController extends Controller
     }
 
     /**
-     * @OA\Get(
-     *     path="/products/{id}",
-     *     summary="Chi tiết sản phẩm",
-     *     tags={"Products"},
-     *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer")),
-     *     @OA\Response(
-     *         response=200, 
-     *         description="Thành công",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="data", ref="#/components/schemas/Product")
-     *         )
-     *     ),
-     *     @OA\Response(response=404, description="Sản phẩm không tồn tại")
-     * )
+     * Xem chi tiết 1 sản phẩm cụ thể.
+     * Trả về thông tin sản phẩm kèm theo bảng biến thể (màu sắc, dung lượng) và đánh giá.
      */
     public function show($id)
     {
@@ -295,7 +108,11 @@ class ProductController extends Controller
             'variants.ram', 
             'variants.storage', 
             'images'
-        ])->find($id);
+        ])->withCount(['reviews' => function($query) {
+            $query->where('status', 'approved');
+        }])->withAvg(['reviews' => function($query) {
+            $query->where('status', 'approved');
+        }], 'rating')->find($id);
         if (!$product) {
             return response()->json([
                 'success' => false,
@@ -309,41 +126,8 @@ class ProductController extends Controller
     }
 
     /**
-     * @OA\Post(
-     *     path="/products/create",
-     *     summary="Tạo sản phẩm mới (Yêu cầu: superadmin, admin)",
-     *     tags={"Products"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\MediaType(
-     *             mediaType="multipart/form-data",
-     *             @OA\Schema(
-     *                 required={"name", "base_price", "category_id"},
-     *                 @OA\Property(property="name", type="string", example="iPhone 15 Pro Max 256GB"),
-     *                 @OA\Property(property="description", type="string", example="Mô tả chi tiết sản phẩm"),
-     *                 @OA\Property(property="base_price", type="number", example=5000000),
-     *                 @OA\Property(property="sale_price", type="number", nullable=true),
-     *                 @OA\Property(property="sku", type="string", example="SKU12345"),
-     *                 @OA\Property(property="category_id", type="integer", example=3)  ,
-     *                 @OA\Property(property="stock_quantity", type="integer", example=10),
-     *                 @OA\Property(property="image", type="string", format="binary", description="Ảnh đại diện (Sẽ được nén webp)"),
-     *                 @OA\Property(property="gallery_images[]", type="array", @OA\Items(type="string", format="binary"), description="Danh sách ảnh phụ (Tối đa 5)")
-     *             )
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=201, 
-     *         description="Tạo thành công",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Sản phẩm đã được tạo thành công!"),
-     *             @OA\Property(property="product", ref="#/components/schemas/Product")
-     *         )
-     *     ),
-     *     @OA\Response(response=403, description="Không có quyền truy cập"),
-     *     @OA\Response(response=422, description="Lỗi validation")
-     * )
+     * Thêm sản phẩm mới (Chỉ dành cho Admin).
+     * Xử lý upload ảnh, lưu thông tin cơ bản và tách thông số kỹ thuật lưu vào bảng phone_specifications.
      */
     public function store(StoreProductRequest $request)
     {
@@ -352,16 +136,8 @@ class ProductController extends Controller
         $validatedData['slug'] = Str::slug($request->name) . '-' . time();
 
         if ($request->hasFile('image')) {
-            $uploaded = cloudinary()->uploadApi()->upload($request->file('image')->getRealPath(), [
-                'folder' => 'products',
-                'transformation' => [
-                    'width' => 1000,
-                    'crop' => 'limit',
-                    'quality' => 'auto',
-                    'fetch_format' => 'webp'
-                ]
-            ]);
-            $validatedData['image_url'] = $uploaded['secure_url'];
+            $path = $request->file('image')->store('products', 'public');
+            $validatedData['image_url'] = url('storage/' . $path);
         }
 
         // Tách các trường thông số kỹ thuật để lưu vào bảng phone_specifications
@@ -376,30 +152,56 @@ class ProductController extends Controller
         $product = Product::create($productData);
         $product->specifications()->create($specData);
 
-        // Tự động tạo variant default
-        $product->variants()->create([
-            'sku'            => $productData['sku'] . '-DEFAULT',
-            'price'          => $productData['base_price'],
-            'stock_quantity' => $productData['stock_quantity'] ?? 0,
-            'image_url'      => $productData['image_url'] ?? null,
-            'is_available'   => true,
-        ]);
+        // Cập nhật variants nếu có dữ liệu màu/dung lượng gửi lên
+        $colors = $request->input('colors', []);
+        $storages = $request->input('storages', []);
+        
+        if (!empty($colors) || !empty($storages)) {
+            if (empty($colors)) $colors = [null];
+            if (empty($storages)) $storages = [null];
+
+            $totalVariants = count($colors) * count($storages);
+            $totalInputStock = (int) ($product->stock_quantity ?? 0);
+            $baseStock = $totalVariants > 0 ? (int) floor($totalInputStock / $totalVariants) : 0;
+            $remainder = $totalVariants > 0 ? ($totalInputStock % $totalVariants) : 0;
+
+            $isFirst = true;
+            foreach ($colors as $cName) {
+                $colorId = null;
+                if ($cName) {
+                    $color = \App\Models\Color::firstOrCreate(['name' => $cName], ['hex_code' => '#000000']);
+                    $colorId = $color->id;
+                }
+                
+                foreach ($storages as $sValue) {
+                    $storageId = null;
+                    if ($sValue) {
+                        $storage = \App\Models\StorageOption::firstOrCreate(['value' => $sValue]);
+                        $storageId = $storage->id;
+                    }
+
+                    $variantStock = $baseStock + ($isFirst ? $remainder : 0);
+                    $isFirst = false;
+
+                    $product->variants()->create([
+                        'sku' => $product->sku . '-' . Str::slug($cName ?: 'default') . '-' . Str::slug($sValue ?: 'default'),
+                        'color_id' => $colorId,
+                        'storage_id' => $storageId,
+                        'price' => $product->base_price,
+                        'stock_quantity' => $variantStock,
+                        'is_available' => true,
+                    ]);
+                }
+            }
+        }
 
         // Upload gallery images
         if ($request->hasFile('gallery_images')) {
             foreach ($request->file('gallery_images') as $index => $galleryImage) {
-                $uploaded = cloudinary()->uploadApi()->upload($galleryImage->getRealPath(), [
-                    'folder' => 'products_gallery',
-                    'transformation' => [
-                        'width' => 1000,
-                        'crop' => 'limit',
-                        'quality' => 'auto',
-                        'fetch_format' => 'webp'
-                    ]
-                ]);
+                $path = $galleryImage->store('products_gallery', 'public');
                 
                 $product->images()->create([
-                    'image_url' => $uploaded['secure_url'],
+                    'image_url' => url('storage/' . $path),
                     'is_primary' => false,
                     'sort_order' => $index
                 ]);
@@ -416,41 +218,8 @@ class ProductController extends Controller
     }
 
     /**
-     * @OA\Post(
-     *     path="/products/{id}",
-     *     summary="Cập nhật sản phẩm (Yêu cầu: superadmin, admin)",
-     *     description="Vì Laravel không hỗ trợ file upload qua PUT trực tiếp một cách tốt nhất, hãy dùng POST kèm tham số _method=PUT",
-     *     tags={"Products"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer")),
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\MediaType(
-     *             mediaType="multipart/form-data",
-     *             @OA\Schema(
-     *                 @OA\Property(property="_method", type="string", example="PUT"),
-     *                 @OA\Property(property="name", type="string"),
-     *                 @OA\Property(property="description", type="string"),
-     *                 @OA\Property(property="base_price", type="number"),
-     *                 @OA\Property(property="sale_price", type="number", nullable=true),
-     *                 @OA\Property(property="category_id", type="integer"),
-     *                 @OA\Property(property="stock_quantity", type="integer"),
-     *                 @OA\Property(property="image", type="string", format="binary", description="Ảnh đại diện mới"),
-     *                 @OA\Property(property="gallery_images[]", type="array", @OA\Items(type="string", format="binary"), description="Danh sách ảnh phụ mới (Sẽ ghi đè ảnh cũ)")
-     *             )
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=200, 
-     *         description="Cập nhật thành công",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Sản phẩm đã được cập nhật thành công!"),
-     *             @OA\Property(property="product", ref="#/components/schemas/Product")
-     *         )
-     *     ),
-     *     @OA\Response(response=403, description="Không có quyền truy cập")
-     * )
+     * Cập nhật thông tin sản phẩm (Chỉ dành cho Admin).
+     * Xóa ảnh cũ (nếu có cập nhật ảnh mới), cập nhật thông số và tự động sinh các biến thể (variants).
      */
     public function update(UpdateProductRequest $request, $id)
     {
@@ -464,30 +233,10 @@ class ProductController extends Controller
         if ($request->hasFile('image')) {
             // Delete old primary image correctly using raw path
             if ($oldUrl = $product->getRawOriginal('image_url')) {
-                if (Str::contains($oldUrl, 'res.cloudinary.com')) {
-                    $parts = explode('/upload/', $oldUrl);
-                    if (isset($parts[1])) {
-                        $path = preg_replace('/^v\d+\//', '', $parts[1]); 
-                        $publicId = pathinfo($path, PATHINFO_DIRNAME) . '/' . pathinfo($path, PATHINFO_FILENAME);
-                        if ($publicId && $publicId !== '.') {
-                            cloudinary()->uploadApi()->destroy($publicId);
-                        }
-                    }
-                } else {
-                    Storage::disk('public')->delete($oldUrl);
-                }
+                Storage::disk('public')->delete(str_replace(url('storage') . '/', '', $oldUrl));
             }
-            
-            $uploaded = cloudinary()->uploadApi()->upload($request->file('image')->getRealPath(), [
-                'folder' => 'products',
-                'transformation' => [
-                    'width' => 1000,
-                    'crop' => 'limit',
-                    'quality' => 'auto',
-                    'fetch_format' => 'webp'
-                ]
-            ]);
-            $validatedData['image_url'] = $uploaded['secure_url'];
+            $path = $request->file('image')->store('products', 'public');
+            $validatedData['image_url'] = url('storage/' . $path);
         }
 
         // Tách các trường thông số kỹ thuật để lưu vào bảng phone_specifications
@@ -506,17 +255,73 @@ class ProductController extends Controller
                 $specData
             );
         }
+
+        // Cập nhật variants (màu và dung lượng)
+        if ($request->has('colors') || $request->has('storages')) {
+            $colors = $request->input('colors', []);
+            $storages = $request->input('storages', []);
+
+            if (empty($colors)) $colors = [null];
+            if (empty($storages)) $storages = [null];
+
+            $keepSkus = [];
+
+            foreach ($colors as $cName) {
+                $colorId = null;
+                if ($cName) {
+                    $color = \App\Models\Color::firstOrCreate(['name' => $cName], ['hex_code' => '#000000']);
+                    $colorId = $color->id;
+                }
+                
+                foreach ($storages as $sValue) {
+                    $storageId = null;
+                    if ($sValue) {
+                        $storage = \App\Models\StorageOption::firstOrCreate(['value' => $sValue]);
+                        $storageId = $storage->id;
+                    }
+
+                    $sku = $product->sku . '-' . Str::slug($cName ?: 'default') . '-' . Str::slug($sValue ?: 'default');
+                    $keepSkus[] = $sku;
+
+                    $variant = $product->variants()->withTrashed()->where('sku', $sku)->first();
+                    
+                    if ($variant) {
+                        // Khôi phục biến thể và giữ nguyên số lượng tồn kho của biến thể đã có
+                        $variant->restore();
+                        $variant->update([
+                            'color_id' => $colorId,
+                            'storage_id' => $storageId,
+                            'price' => $product->base_price,
+                            'is_available' => true,
+                        ]);
+                    } else {
+                        // Biến thể mới được thêm khi chỉnh sửa khởi tạo với số lượng tồn kho = 0
+                        $product->variants()->create([
+                            'sku' => $sku,
+                            'color_id' => $colorId,
+                            'storage_id' => $storageId,
+                            'price' => $product->base_price,
+                            'stock_quantity' => 0,
+                            'is_available' => true,
+                        ]);
+                    }
+                }
+            }
+
+            // Xóa biến thể không còn nằm trong lựa chọn mới
+            $product->variants()->whereNotIn('sku', $keepSkus)->delete();
+
+            // Tính lại tổng số lượng tồn kho sản phẩm từ tất cả các biến thể
+            $totalVariantStock = $product->variants()->sum('stock_quantity');
+            $product->update(['stock_quantity' => $totalVariantStock]);
+        }
+
         if ($request->hasFile('gallery_images')) {
             // Replace all existing gallery images
             foreach ($product->images as $oldImage) {
                 if ($oldUrl = $oldImage->getRawOriginal('image_url')) {
                     if (Str::contains($oldUrl, 'res.cloudinary.com')) {
-                        $parts = explode('/upload/', $oldUrl);
-                        if (isset($parts[1])) {
-                            $path = preg_replace('/^v\d+\//', '', $parts[1]); 
-                            $publicId = pathinfo($path, PATHINFO_DIRNAME) . '/' . pathinfo($path, PATHINFO_FILENAME);
-                            if ($publicId && $publicId !== '.') cloudinary()->uploadApi()->destroy($publicId);
-                        }
+                        // Skip deleting from cloudinary
                     } else {
                         Storage::disk('public')->delete($oldUrl);
                     }
@@ -525,18 +330,10 @@ class ProductController extends Controller
             }
 
             foreach ($request->file('gallery_images') as $index => $galleryImage) {
-                $uploaded = cloudinary()->uploadApi()->upload($galleryImage->getRealPath(), [
-                    'folder' => 'products_gallery',
-                    'transformation' => [
-                        'width' => 1000,
-                        'crop' => 'limit',
-                        'quality' => 'auto',
-                        'fetch_format' => 'webp'
-                    ]
-                ]);
+                $path = $galleryImage->store('products_gallery', 'public');
                 
                 $product->images()->create([
-                    'image_url' => $uploaded['secure_url'],
+                    'image_url' => url('storage/' . $path),
                     'is_primary' => false,
                     'sort_order' => $index
                 ]);
@@ -553,23 +350,8 @@ class ProductController extends Controller
     }
 
     /**
-     * @OA\Delete(
-     *     path="/products/{id}",
-     *     summary="Xóa sản phẩm (Yêu cầu: superadmin, admin)",
-     *     tags={"Products"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer")),
-     *     @OA\Response(
-     *         response=200, 
-     *         description="Xóa thành công",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Sản phẩm đã được xóa thành công!")
-     *         )
-     *     ),
-     *     @OA\Response(response=403, description="Không có quyền truy cập"),
-     *     @OA\Response(response=404, description="Sản phẩm không tồn tại")
-     * )
+     * Xóa sản phẩm (Chỉ dành cho Admin).
+     * Áp dụng Soft Delete (Xóa mềm), sản phẩm chỉ bị ẩn đi chứ không bị xóa vĩnh viễn khỏi Database.
      */
     public function destroy($id)
     {

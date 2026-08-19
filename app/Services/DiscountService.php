@@ -28,11 +28,14 @@ class DiscountService
         }
 
         $now = now()->toDateString();
-        if ($coupon->start_date > $now) {
+        $startDate = $coupon->start_date->toDateString();
+        $endDate = $coupon->end_date->toDateString();
+
+        if ($startDate > $now) {
             throw new Exception('Mã giảm giá chưa đến ngày bắt đầu sử dụng.');
         }
 
-        if ($coupon->end_date < $now) {
+        if ($endDate < $now) {
             throw new Exception('Mã giảm giá này đã hết hạn.');
         }
 
@@ -67,7 +70,8 @@ class DiscountService
      */
     public function applyCoupon(string $code): bool
     {
-        $coupon = Coupon::where('code', $code)->first();
+        // Sử dụng lockForUpdate() để khóa dữ liệu mã giảm giá trong Transaction, chống lỗi đồng thời (Race Condition)
+        $coupon = Coupon::where('code', $code)->lockForUpdate()->first();
         if ($coupon && $coupon->isValid()) {
             $coupon->increment('used_count');
             return true;

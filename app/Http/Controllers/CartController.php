@@ -12,34 +12,8 @@ use Illuminate\Support\Facades\DB;
 class CartController extends Controller
 {
     /**
-     * @OA\Get(
-     *     path="/cart",
-     *     summary="Lấy thông tin giỏ hàng",
-     *     tags={"Cart"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
-     *         name="X-Session-ID",
-     *         in="header",
-     *         description="Session ID cho khách vãng lai",
-     *         required=false,
-     *         @OA\Schema(type="string")
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Lấy thông tin thành công",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(
-     *                 property="data", 
-     *                 type="object",
-     *                 @OA\Property(property="cart_id", type="integer"),
-     *                 @OA\Property(property="items", type="array", @OA\Items(type="object")),
-     *                 @OA\Property(property="total_quantity", type="integer"),
-     *                 @OA\Property(property="total_price", type="number")
-     *             )
-     *         )
-     *     )
-     * )
+     * Lấy toàn bộ sản phẩm trong giỏ hàng của user/session hiện tại.
+     * Trả về JSON chứa danh sách item, tổng số lượng và tổng tiền.
      */
     public function index(Request $request)
     {
@@ -79,39 +53,9 @@ class CartController extends Controller
     }
 
     /**
-     * @OA\Post(
-     *     path="/cart/add",
-     *     summary="Thêm sản phẩm vào giỏ hàng",
-     *     tags={"Cart"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
-     *         name="X-Session-ID",
-     *         in="header",
-     *         description="Session ID cho khách vãng lai",
-     *         required=false,
-     *         @OA\Schema(type="string")
-     *     ),
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"product_id", "quantity"},
-     *             @OA\Property(property="product_id", type="integer", example=1),
-     *             @OA\Property(property="product_variant_id", type="integer", nullable=true, example=1),
-     *             @OA\Property(property="quantity", type="integer", example=1)
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=201, 
-     *         description="Thêm sản phẩm thành công",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Đã thêm sản phẩm vào giỏ hàng."),
-     *             @OA\Property(property="data", type="object")
-     *         )
-     *     ),
-     *     @OA\Response(response=400, description="Dữ liệu không hợp lệ / Hết hàng"),
-     *     @OA\Response(response=500, description="Lỗi server")
-     * )
+     * Thêm sản phẩm mới vào giỏ hàng.
+     * Đầu vào: product_id, quantity, product_variant_id (nếu có).
+     * Trả về JSON báo thành công và dữ liệu sản phẩm vừa thêm.
      */
     public function add(Request $request)
     {
@@ -189,44 +133,9 @@ class CartController extends Controller
     }
 
     /**
-     * @OA\Put(
-     *     path="/cart/update/{itemId}",
-     *     summary="Cập nhật số lượng sản phẩm trong giỏ",
-     *     tags={"Cart"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
-     *         name="itemId",
-     *         in="path",
-     *         required=true,
-     *         description="ID của chi tiết giỏ hàng (CartItem ID)",
-     *         @OA\Schema(type="integer")
-     *     ),
-     *     @OA\Parameter(
-     *         name="X-Session-ID",
-     *         in="header",
-     *         description="Session ID cho khách vãng lai",
-     *         required=false,
-     *         @OA\Schema(type="string")
-     *     ),
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"quantity"},
-     *             @OA\Property(property="quantity", type="integer", example=2)
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=200, 
-     *         description="Cập nhật thành công",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Cập nhật số lượng thành công."),
-     *             @OA\Property(property="data", type="object")
-     *         )
-     *     ),
-     *     @OA\Response(response=400, description="Không đủ số lượng tồn kho"),
-     *     @OA\Response(response=404, description="Không tìm thấy giỏ hàng hoặc sản phẩm")
-     * )
+     * Cập nhật số lượng của một sản phẩm đã có trong giỏ.
+     * Đầu vào: itemId (ID của dòng trong giỏ hàng), quantity (số lượng mới).
+     * Trả về JSON báo cập nhật thành công.
      */
     public function update(Request $request, $itemId)
     {
@@ -265,35 +174,8 @@ class CartController extends Controller
     }
 
     /**
-     * @OA\Delete(
-     *     path="/cart/remove/{itemId}",
-     *     summary="Xóa 1 sản phẩm khỏi giỏ hàng",
-     *     tags={"Cart"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
-     *         name="itemId",
-     *         in="path",
-     *         required=true,
-     *         description="ID của chi tiết giỏ hàng (CartItem ID)",
-     *         @OA\Schema(type="integer")
-     *     ),
-     *     @OA\Parameter(
-     *         name="X-Session-ID",
-     *         in="header",
-     *         description="Session ID cho khách vãng lai",
-     *         required=false,
-     *         @OA\Schema(type="string")
-     *     ),
-     *     @OA\Response(
-     *         response=200, 
-     *         description="Xóa thành công",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Đã xóa sản phẩm khỏi giỏ hàng.")
-     *         )
-     *     ),
-     *     @OA\Response(response=404, description="Không tìm thấy giỏ hàng hoặc sản phẩm")
-     * )
+     * Xóa 1 sản phẩm khỏi giỏ hàng.
+     * Đầu vào: itemId (ID của dòng trong giỏ hàng).
      */
     public function remove(Request $request, $itemId)
     {
@@ -316,27 +198,7 @@ class CartController extends Controller
     }
 
     /**
-     * @OA\Delete(
-     *     path="/cart/clear",
-     *     summary="Xóa toàn bộ giỏ hàng",
-     *     tags={"Cart"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
-     *         name="X-Session-ID",
-     *         in="header",
-     *         description="Session ID cho khách vãng lai",
-     *         required=false,
-     *         @OA\Schema(type="string")
-     *     ),
-     *     @OA\Response(
-     *         response=200, 
-     *         description="Xóa thành công",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Đã xóa tất cả sản phẩm trong giỏ hàng.")
-     *         )
-     *     )
-     * )
+     * Xóa sạch toàn bộ giỏ hàng.
      */
     public function clear(Request $request)
     {
@@ -355,6 +217,11 @@ class CartController extends Controller
 
     /**
      * Helper to get existing cart.
+     */
+    /**
+     * Hàm dùng chung: Lấy Giỏ hàng (Cart) từ Database.
+     * Ưu tiên 1: Lấy theo tài khoản User đang đăng nhập.
+     * Ưu tiên 2: Lấy theo Session ID (Dành cho khách vãng lai chưa đăng nhập).
      */
     private function getCart(Request $request)
     {

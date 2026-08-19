@@ -20,61 +20,13 @@ use App\Http\Requests\ResetPasswordRequest;
 
 
 
-/**
- * @OA\Schema(
- *     schema="User",
- *     title="User",
- *     description="User model schema",
- *     @OA\Property(property="id", type="integer", example=1),
- *     @OA\Property(property="name", type="string", example="Nguyen Van A"),
- *     @OA\Property(property="email", type="string", example="user@gmail.com"),
- *     @OA\Property(property="phone", type="string", nullable=true, example="0123456789"),
- *     @OA\Property(property="gender", type="string", enum={"male", "female", "other"}, nullable=true, example="male"),
- *     @OA\Property(property="birthday", type="string", format="date", nullable=true, example="1990-01-01"),
- *     @OA\Property(property="avatar", type="string", nullable=true, example="avatar.png"),
- *     @OA\Property(property="is_active", type="boolean", example=true),
- *     @OA\Property(property="created_at", type="string", format="date-time"),
- *     @OA\Property(property="updated_at", type="string", format="date-time")
- * )
- */
 class AuthController extends Controller
 {
     /**
-     * @OA\Post(
-     *     path="/register",
-     *     summary="Đăng ký tài khoản",
-     *     tags={"Auth"},
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"name","email","password","password_confirmation"},
-     *             @OA\Property(property="name", type="string", example="Nguyen Van A"),
-     *             @OA\Property(property="email", type="string", example="user@gmail.com"),
-     *             @OA\Property(property="password", type="string", example="123456"),
-     *             @OA\Property(property="password_confirmation", type="string", example="123456")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=201, 
-     *         description="Đăng ký thành công",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Đăng ký thành công"),
-     *             @OA\Property(property="token", type="string", example="eyJhbGciOiJIUz..."),
-     *             @OA\Property(property="user", ref="#/components/schemas/User")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=422, 
-     *         description="Lỗi validation",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Dữ liệu gửi lên không hợp lệ."),
-     *             @OA\Property(property="errors", type="object", example={"email": {"Email đã được sử dụng."}})
-     *         )
-     *     )
-     * )
+     * Xử lý Đăng ký tài khoản khách hàng.
+     * Đầu vào: Tên, Email, Mật khẩu.
+     * Hoạt động: Lưu user mới vào DB, mã hóa mật khẩu, tự động đăng nhập và trả về Token JWT.
      */
-    // SIGNUP
     public function register(RegisterRequest $request)
     {
         $validatedData = $request->validated();
@@ -85,7 +37,8 @@ class AuthController extends Controller
             'password' => Hash::make($validatedData['password']),
         ]);
 
-        $token = Auth::login($user);
+        $credentials = $request->only('email', 'password');
+        $token = Auth::attempt($credentials);
 
         return response()->json([
             'success' => true,
@@ -97,109 +50,10 @@ class AuthController extends Controller
 
 
     /**
-     * @OA\Post(
-     *     path="/login",
-     *     summary="Đăng nhập hệ thống",
-     *     description="API cho phép người dùng đăng nhập bằng email và mật khẩu. Nếu thông tin hợp lệ, hệ thống sẽ trả về JWT token.",
-     *     operationId="loginUser",
-     *     tags={"Auth"},
-     *
-     *     @OA\RequestBody(
-     *         required=true,
-     *         description="Thông tin đăng nhập",
-     *         @OA\JsonContent(
-     *             required={"email","password"},
-     *
-     *             @OA\Property(
-     *                 property="email",
-     *                 type="string",
-     *                 format="email",
-     *                 example="user@gmail.com",
-     *                 description="Email của người dùng"
-     *             ),
-     *
-     *             @OA\Property(
-     *                 property="password",
-     *                 type="string",
-     *                 format="password",
-     *                 example="123456",
-     *                 description="Mật khẩu đăng nhập"
-     *             )
-     *         )
-     *     ),
-     *
-     *     @OA\Response(
-     *         response=200,
-     *         description="Đăng nhập thành công",
-     *         @OA\JsonContent(
-     *             type="object",
-     *
-     *             @OA\Property(
-     *                 property="success",
-     *                 type="boolean",
-     *                 example=true
-     *             ),
-     *
-     *             @OA\Property(
-     *                 property="message",
-     *                 type="string",
-     *                 example="Đăng nhập thành công"
-     *             ),
-     *
-     *             @OA\Property(
-     *                 property="token",
-     *                 type="string",
-     *                 example="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-     *             ),
-     *
-     *             @OA\Property(
-     *                 property="user",
-     *                 type="object",
-     *
-     *                 @OA\Property(property="id", type="integer", example=1),
-     *                 @OA\Property(property="name", type="string", example="Nguyen Van A"),
-     *                 @OA\Property(property="email", type="string", example="user@gmail.com"),
-     *                 @OA\Property(property="is_active", type="boolean", example=true)
-     *             )
-     *         )
-     *     ),
-     *
-     *     @OA\Response(
-     *         response=401,
-     *         description="Sai email hoặc mật khẩu",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Email hoặc mật khẩu không đúng")
-     *         )
-     *     ),
-     *
-     *     @OA\Response(
-     *         response=403,
-     *         description="Tài khoản bị khóa",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên.")
-     *         )
-     *     ),
-     *
-     *     @OA\Response(
-     *         response=422,
-     *         description="Dữ liệu không hợp lệ",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Dữ liệu gửi lên không hợp lệ."),
-     *             @OA\Property(
-     *                 property="errors",
-     *                 type="object",
-     *                 example={
-     *                     "email": {"Email không hợp lệ."},
-     *                     "password": {"Mật khẩu không hợp lệ."}
-     *                 }
-     *             )
-     *         )
-     *     )
-     * )
+     * Xử lý Đăng nhập hệ thống.
+     * Đầu vào: Email, Mật khẩu.
+     * Hoạt động: Kiểm tra tài khoản, nếu đúng cấp phát JWT Token. Nếu tài khoản bị khóa (is_active = false) thì từ chối.
      */
-    // LOGIN
     public function login(LoginRequest $request)
     {
         $credentials = $request->only('email', 'password');
@@ -227,18 +81,6 @@ class AuthController extends Controller
             'user' => $user
         ]);
     }
-    /**
-     * @OA\Post(
-     *     path="/logout",
-     *     summary="Đăng xuất",
-     *     tags={"Auth"},
-     *     @OA\RequestBody(
-     *         required=true
-     *     ),
-     *     @OA\Response(response=200, description="Đăng xuất thành công"),
-     *     @OA\Response(response=401, description="Unauthorized")
-     * )
-     */
     // LOGOUT
     public function logout()
     {
@@ -252,23 +94,6 @@ class AuthController extends Controller
 
 
 
-    /**
-     * @OA\Get(
-     *     path="/me",
-     *     summary="Lấy thông tin người dùng đang đăng nhập",
-     *     tags={"Auth"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Response(
-     *         response=200,
-     *         description="Thành công",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="user", ref="#/components/schemas/User")
-     *         )
-     *     ),
-     *     @OA\Response(response=401, description="Unauthorized")
-     * )
-     */
     // LẤY THÔNG TIN USER ĐANG ĐĂNG NHẬP
     public function me()
     {
@@ -280,6 +105,14 @@ class AuthController extends Controller
                     'success' => false,
                     'message' => 'Unauthorized'
                 ], 401);
+            }
+
+            if (isset($user->is_active) && !$user->is_active) {
+                Auth::logout();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên.'
+                ], 403);
             }
 
             return response()->json([
@@ -304,36 +137,6 @@ class AuthController extends Controller
         }
     }
 
-    /**
-     * @OA\Post(
-     *     path="/forgot-password",
-     *     summary="Quên mật khẩu - gửi link đặt lại qua email",
-     *     tags={"Auth"},
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"email"},
-     *             @OA\Property(property="email", type="string", example="user@gmail.com")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Gửi email thành công",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Link đặt lại mật khẩu đã được gửi vào email của bạn.")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=422,
-     *         description="Validation lỗi",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="errors", type="string", example="Email không tồn tại trong hệ thống.")
-     *         )
-     *     )
-     * )
-     */
     public function forgotPassword(ForgotPasswordRequest $request)
     {
         // Tạo token ngẫu nhiên
@@ -346,7 +149,7 @@ class AuthController extends Controller
             'created_at' => now(),
         ]);
         // Link gửi cho user (trỏ về frontend)
-        $resetLink = env('FRONTEND_URL_RESSETPASS', 'https://lt-createwebfunitureluxury.onrender.com/reset-password')
+        $resetLink = env('FRONTEND_URL_RESSETPASS', 'http://localhost:5173/reset-password')
             . '?token=' . $token
             . '&email=' . urlencode($request->email);
         // Gửi mail
@@ -365,47 +168,6 @@ class AuthController extends Controller
             'message' => 'Link đặt lại mật khẩu đã được gửi vào email của bạn.',
         ]);
     }
-    /**
-     * @OA\Post(
-     *     path="/reset-password",
-     *     summary="Đặt lại mật khẩu mới",
-     *     tags={"Auth"},
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"email","token","password","password_confirmation"},
-     *             @OA\Property(property="email", type="string", example="user@gmail.com"),
-     *             @OA\Property(property="token", type="string", example="abc123xyz..."),
-     *             @OA\Property(property="password", type="string", example="newpassword123"),
-     *             @OA\Property(property="password_confirmation", type="string", example="newpassword123")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Đặt lại mật khẩu thành công",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Đặt lại mật khẩu thành công.")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=400,
-     *         description="Token không hợp lệ hoặc đã hết hạn",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Token không hợp lệ hoặc đã hết hạn.")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=422,
-     *         description="Validation lỗi",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="errors", type="object")
-     *         )
-     *     )
-     * )
-     */
     // ========================
     // ĐẶT LẠI MẬT KHẨU MỚI
     // ========================
@@ -441,34 +203,6 @@ class AuthController extends Controller
             'message' => 'Đặt lại mật khẩu thành công.'
         ]);
     }
-    /**
-     * @OA\Put(
-     *     path="/update-profile",
-     *     summary="Cập nhật thông tin cá nhân",
-     *     tags={"Auth"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             @OA\Property(property="name", type="string", example="Nguyen Van B"),
-     *             @OA\Property(property="phone", type="string", example="0123456789"),
-     *             @OA\Property(property="gender", type="string", enum={"male", "female", "other"}, example="male"),
-     *             @OA\Property(property="birthday", type="string", format="date", example="1990-01-01")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Cập nhật thành công",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Cập nhật thông tin thành công"),
-     *             @OA\Property(property="user", ref="#/components/schemas/User")
-     *         )
-     *     ),
-     *     @OA\Response(response=401, description="Unauthorized"),
-     *     @OA\Response(response=422, description="Validation lỗi")
-     * )
-     */
     public function updateProfile(UpdateProfileRequest $request)
     {
         $user = Auth::user();
@@ -493,19 +227,12 @@ class AuthController extends Controller
         ]);
     }
 
-    /**
-     * @OA\Get(
-     *     path="/auth/google",
-     *     summary="Chuyển hướng sang trang đăng nhập Google",
-     *     description="GỌI TRÊN TRÌNH DUYỆT: Endpoint này không trả về JSON. Nó sẽ redirect người dùng sang trang OAuth của Google. Sau khi người dùng đăng nhập, Google sẽ gọi lại endpoint /callback kèm theo mã 'code'.",
-     *     tags={"Auth"},
-     *     @OA\Response(response=302, description="Redirect to Google OAuth")
-     * )
-     */
     public function redirectToGoogle()
     {
         $redirectUrl = config('services.google.redirect');
-        $driver = Socialite::driver('google')->stateless()->redirectUrl($redirectUrl);
+        /** @var \Laravel\Socialite\Two\GoogleProvider $driver */
+        $driver = Socialite::driver('google');
+        $driver->stateless()->redirectUrl($redirectUrl);
 
         // Bỏ qua kiểm tra SSL trên môi trường local (Windows)
         if (config('app.env') === 'local') {
@@ -519,28 +246,13 @@ class AuthController extends Controller
             ->header('Content-Type', 'text/html');
     }
 
-    /**
-     * @OA\Get(
-     *     path="/auth/google/callback",
-     *     summary="Xử lý callback từ Google (Hệ thống tự động gọi)",
-     *     description="HÀNH VI TỰ ĐỘNG: Endpoint này được thiết kế để Google gọi lại sau khi người dùng xác thực thành công. Mã 'code' được Google cấp tự động và chỉ có hiệu lực một lần trong vài giây. Không nên gọi endpoint này một cách thủ công từ Swagger/Postman.",
-     *     tags={"Auth"},
-     *     @OA\Parameter(
-     *         name="code",
-     *         in="query",
-     *         required=true,
-     *         description="Mã xác thực một lần (One-time code) do Google cấp",
-     *         @OA\Schema(type="string")
-     *     ),
-     *     @OA\Response(response=302, description="Redirect về Frontend kèm token hoặc lỗi")
-     * )
-     */
-
     public function handleGoogleCallback()
     {
         try {
             $redirectUrl = config('services.google.redirect');
-            $driver = Socialite::driver('google')->stateless()->redirectUrl($redirectUrl);
+            /** @var \Laravel\Socialite\Two\GoogleProvider $driver */
+            $driver = Socialite::driver('google');
+            $driver->stateless()->redirectUrl($redirectUrl);
 
             // Bỏ qua kiểm tra SSL trên môi trường local (Windows)
             if (config('app.env') === 'local') {
@@ -558,7 +270,20 @@ class AuthController extends Controller
                     'name' => $googleUser->getName(),
                     'email' => $googleUser->getEmail(),
                     'password' => Hash::make(Str::random(24)),
+                    'is_active' => true,
                 ]);
+            }
+
+            // Kiểm tra xem tài khoản có bị khóa (is_active = false) không
+            if (isset($user->is_active) && !$user->is_active) {
+                $frontendUrl = env('FRONTEND_URL', 'http://localhost:5173');
+                return response()
+                    ->view('auth.callback', [
+                        'error' => 'locked',
+                        'message' => 'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên.',
+                        'frontendUrl' => $frontendUrl
+                    ])
+                    ->header('Content-Type', 'text/html');
             }
 
             // Đăng nhập và tạo token
@@ -566,7 +291,7 @@ class AuthController extends Controller
             $token = Auth::login($user);
 
             // Redirect về Frontend kèm Token
-            $frontendUrl = env('FRONTEND_URL', 'https://tttn-2.onrender.com');
+            $frontendUrl = env('FRONTEND_URL', 'http://localhost:5173');
             // Thay vì redirect toàn trang, trả về view để gửi message tới trang mẹ
             return response()
                 ->view('auth.callback', [
@@ -578,7 +303,7 @@ class AuthController extends Controller
 
         } catch (\Exception $e) {
             \Log::error('Google Login Error: ' . $e->getMessage());
-            $frontendUrl = env('FRONTEND_URL', 'https://tttn-2.onrender.com');
+            $frontendUrl = env('FRONTEND_URL', 'http://localhost:5173');
             return response()
                 ->view('auth.callback', [
                     'error' => 'google_failed',
@@ -591,5 +316,31 @@ class AuthController extends Controller
 
 
 
+
+    public function changePassword(Request $request)
+    {
+        $request->validate([
+            'old_password' => 'required',
+            'new_password' => 'required|min:6',
+        ]);
+
+        $user = Auth::user();
+
+        if (!Hash::check($request->old_password, $user->password)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Mật khẩu cũ không đúng.'
+            ], 400);
+        }
+
+        $user->update([
+            'password' => Hash::make($request->new_password)
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Đổi mật khẩu thành công.'
+        ]);
+    }
 
 }

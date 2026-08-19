@@ -7,11 +7,15 @@ use App\Models\OrderItem;
 use App\Models\Cart;
 use App\Models\CartItem;
 use App\Models\Coupon;
+use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Services\DiscountService;
 use App\Services\ShippingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
+use App\Mail\OrderInvoiceMail;
 use Exception;
 
 class OrderController extends Controller
@@ -26,44 +30,8 @@ class OrderController extends Controller
     }
 
     /**
-     * @OA\Post(
-     *     path="/checkout",
-     *     summary="Thanh toán đơn hàng (Checkout)",
-     *     tags={"Orders"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"receiver_name", "receiver_phone", "province_id", "district_id", "ward_id", "address_detail", "payment_method"},
-     *             @OA\Property(property="receiver_name", type="string", example="Nguyen Van A"),
-     *             @OA\Property(property="receiver_phone", type="string", example="0123456789"),
-     *             @OA\Property(property="province_id", type="integer", example=202),
-     *             @OA\Property(property="district_id", type="integer", example=1442),
-     *             @OA\Property(property="ward_id", type="integer", example=20109),
-     *             @OA\Property(property="address_detail", type="string", example="Số 123, Đường ABC"),
-     *             @OA\Property(property="payment_method", type="string", enum={"cod", "bank_transfer", "momo", "vnpay"}, example="cod"),
-     *             @OA\Property(property="coupon_code", type="string", nullable=true, example="SUMMER2024"),
-     *             @OA\Property(property="note", type="string", nullable=true, example="Giao gio hanh chinh")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=201, 
-     *         description="Đặt hàng thành công",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Đặt hàng thành công!"),
-     *             @OA\Property(property="order", type="object")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=422, 
-     *         description="Lỗi validation hoặc mã giảm giá không hợp lệ",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Giỏ hàng của bạn đang trống.")
-     *         )
-     *     )
-     * )
+     * Xử lý Đặt hàng (Dành cho User đã đăng nhập, lấy dữ liệu từ bảng Cart).
+     * Bao gồm: Validate form, áp mã giảm giá, kiểm tra tồn kho, lưu đơn hàng (Order) và gửi Mail.
      */
     public function checkout(Request $request)
     {
@@ -152,15 +120,28 @@ class OrderController extends Controller
                     'product_id' => $cartItem->product_id,
                     'variant_id' => $cartItem->product_variant_id,
                     'product_name' => $cartItem->product->name,
-                    'variant_info' => $cartItem->variant->color . ' - ' . $cartItem->variant->size,
-                    'price' => $cartItem->variant->sale_price ?? $cartItem->variant->price,
+                    'variant_info' => ($cartItem->variant?->color?->name ?? (is_string($cartItem->variant?->color) ? $cartItem->variant->color : '')) . ' - ' . ($cartItem->variant?->storage?->value ?? (is_string($cartItem->variant?->storage) ? $cartItem->variant->storage : '')),
+                    'price' => $cartItem->variant->sale_price ?? $cartItem->variant->price ?? $cartItem->product->sale_price ?? $cartItem->product->base_price,
                     'quantity' => $cartItem->quantity,
-                    'subtotal' => $cartItem->quantity * ($cartItem->variant->sale_price ?? $cartItem->variant->price),
+                    'subtotal' => $cartItem->quantity * ($cartItem->variant->sale_price ?? $cartItem->variant->price ?? $cartItem->product->base_price),
                 ]);
 
-                // Trừ số lượng tồn kho
+                // Trừ số lượng tồn kho biến thể
                 $variant = $cartItem->variant;
-                $variant->decrement('stock_quantity', $cartItem->quantity);
+                if ($variant) {
+                    $variant->decrement('stock_quantity', $cartItem->quantity);
+                }
+
+                // Trừ số lượng và đồng bộ tồn kho sản phẩm gốc
+                $product = $cartItem->product;
+                if ($product) {
+                    if ($product->variants()->count() > 0) {
+                        $totalStock = $product->variants()->sum('stock_quantity');
+                        $product->update(['stock_quantity' => max(0, $totalStock)]);
+                    } else {
+                        $product->decrement('stock_quantity', $cartItem->quantity);
+                    }
+                }
             }
 
             // 4. Nếu có mã giảm giá, áp dụng (tăng used_count)
@@ -173,6 +154,16 @@ class OrderController extends Controller
             $cart->delete();
 
             DB::commit();
+
+            // Send Invoice Email (Try catch to prevent mail failure from breaking checkout)
+            try {
+                $email = $request->customer_email ?? auth()->user()->email ?? null;
+                if ($email) {
+                    Mail::to($email)->send(new OrderInvoiceMail($order));
+                }
+            } catch (Exception $e) {
+                \Log::error('Mail Invoice Error: ' . $e->getMessage());
+            }
 
             return response()->json([
                 'success' => true,
@@ -190,18 +181,125 @@ class OrderController extends Controller
     }
 
     /**
-     * @OA\Get(
-     *     path="/orders",
-     *     summary="Danh sách đơn hàng của người dùng hiện tại",
-     *     tags={"Orders"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Response(response=200, description="Thành công")
-     * )
+     * Checkout trực tiếp từ frontend (Dành cho Khách vãng lai, đọc giỏ hàng từ LocalStorage).
+     * Giống checkout() nhưng không phụ thuộc vào bảng Cart trong Database.
      */
+    public function checkoutDirect(Request $request)
+    {
+        $request->validate([
+            'customer.name' => 'required|string',
+            'customer.phone' => 'required|string',
+            'customer.addr' => 'required|string',
+            'paymentMethod' => 'required|string',
+            'total' => 'required|numeric',
+            'items' => 'required|array'
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            // Lấy user_id giả lập (hoặc lấy từ token nếu có)
+            $user_id = auth()->id() ?? 1;
+
+            $order = Order::create([
+                'user_id' => $user_id,
+                'order_code' => 'ORD-' . strtoupper(Str::random(10)),
+                'receiver_name' => $request->input('customer.name'),
+                'receiver_phone' => $request->input('customer.phone'),
+                'province_id' => 1,
+                'district_id' => 1,
+                'ward_id' => 1,
+                'address_detail' => $request->input('customer.addr'),
+                'shipping_address' => $request->input('customer.addr'),
+                'subtotal' => $request->input('total'),
+                'total_amount' => $request->input('total'),
+                'payment_method' => $request->input('paymentMethod'),
+                'payment_status' => $request->input('paymentMethod') === 'online' ? 'paid' : 'pending',
+                'order_status' => 'pending',
+                'note' => $request->input('customer.email') ? 'Email: ' . $request->input('customer.email') : '',
+            ]);
+
+            foreach ($request->input('items') as $item) {
+                // Extract product_id from key (e.g. "1|Titan|256" -> 1)
+                $keyParts = explode('|', $item['key'] ?? '');
+                $productId = is_numeric($keyParts[0]) ? (int)$keyParts[0] : (isset($item['product_id']) ? (int)$item['product_id'] : (isset($item['id']) ? (int)$item['id'] : 1));
+                $qty = (int)($item['qty'] ?? 1);
+                $colorName = $item['color'] ?? '';
+                $storageVal = $item['storage'] ?? '';
+
+                $product = Product::find($productId);
+                if (!$product) {
+                    $product = Product::first();
+                    if ($product) {
+                        $productId = $product->id;
+                    }
+                }
+
+                $variant = null;
+
+                if ($product) {
+                    // Tìm biến thể khớp với màu và dung lượng
+                    $variant = $product->variants()
+                        ->when($colorName, function($q) use ($colorName) {
+                            $q->whereHas('color', fn($c) => $c->where('name', $colorName));
+                        })
+                        ->when($storageVal, function($q) use ($storageVal) {
+                            $q->whereHas('storage', fn($s) => $s->where('value', $storageVal));
+                        })
+                        ->first();
+
+                    if (!$variant) {
+                        $variant = $product->variants()->first();
+                    }
+
+                    if ($variant) {
+                        $variant->decrement('stock_quantity', $qty);
+                        $totalStock = $product->variants()->sum('stock_quantity');
+                        $product->update(['stock_quantity' => max(0, $totalStock)]);
+                    } else {
+                        $product->decrement('stock_quantity', $qty);
+                    }
+                }
+
+                OrderItem::create([
+                    'order_id' => $order->id,
+                    'product_id' => $productId,
+                    'variant_id' => $variant?->id,
+                    'product_name' => $item['name'] ?? $product?->name ?? 'Sản phẩm',
+                    'variant_info' => ($colorName || $storageVal) ? ($colorName . ' - ' . $storageVal) : 'Mặc định',
+                    'price' => $item['price'] ?? 0,
+                    'quantity' => $qty,
+                    'subtotal' => ($item['price'] ?? 0) * $qty,
+                ]);
+            }
+
+            DB::commit();
+
+            // Send Invoice Email (Try catch to prevent mail failure from breaking checkout)
+            try {
+                $email = $request->input('customer.email') ?? auth()->user()->email ?? null;
+                if ($email) {
+                    Mail::to($email)->send(new OrderInvoiceMail($order));
+                }
+            } catch (\Throwable $e) {
+                \Log::error('Mail Invoice Error: ' . $e->getMessage());
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Đặt hàng thành công!',
+                'order' => $order
+            ], 201);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
     public function index(Request $request)
     {
         $user = auth()->user();
-        $orders = Order::where('user_id', $user->id)
+        $orders = Order::with(['items.product'])->where('user_id', $user->id)
             ->orderBy('created_at', 'desc')
             ->paginate($request->get('limit', 10));
 
@@ -211,21 +309,10 @@ class OrderController extends Controller
         ]);
     }
 
-    /**
-     * @OA\Get(
-     *     path="/orders/{id}",
-     *     summary="Chi tiết đơn hàng",
-     *     tags={"Orders"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer")),
-     *     @OA\Response(response=200, description="Thành công"),
-     *     @OA\Response(response=404, description="Không tìm thấy đơn hàng")
-     * )
-     */
     public function show($id)
     {
         $user = auth()->user();
-        $order = Order::with(['items', 'coupon'])
+        $order = Order::with(['items.product', 'coupon'])
             ->where('user_id', $user->id)
             ->findOrFail($id);
 
@@ -235,18 +322,6 @@ class OrderController extends Controller
         ]);
     }
 
-    /**
-     * @OA\Post(
-     *     path="/orders/{id}/cancel",
-     *     summary="Hủy đơn hàng",
-     *     description="Chỉ được hủy khi trạng thái là pending",
-     *     tags={"Orders"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer")),
-     *     @OA\Response(response=200, description="Hủy thành công"),
-     *     @OA\Response(response=422, description="Không thể hủy đơn hàng ở trạng thái hiện tại")
-     * )
-     */
     public function cancel($id)
     {
         $user = auth()->user();
@@ -269,6 +344,19 @@ class OrderController extends Controller
                 if ($item->variant) {
                     $item->variant->increment('stock_quantity', $item->quantity);
                 }
+                if ($item->product) {
+                    if ($item->product->variants()->count() > 0) {
+                        $totalStock = $item->product->variants()->sum('stock_quantity');
+                        $item->product->update(['stock_quantity' => max(0, $totalStock)]);
+                    } else {
+                        $item->product->increment('stock_quantity', $item->quantity);
+                    }
+                }
+            }
+
+            // Hoàn lại 1 lượt sử dụng cho Mã giảm giá (nếu đơn hàng có áp dụng)
+            if ($order->coupon_id) {
+                \App\Models\Coupon::where('id', $order->coupon_id)->where('used_count', '>', 0)->decrement('used_count');
             }
 
             DB::commit();
@@ -283,19 +371,9 @@ class OrderController extends Controller
         }
     }
 
-    /**
-     * @OA\Get(
-     *     path="/admin/orders",
-     *     summary="[Admin] Danh sách toàn bộ đơn hàng",
-     *     tags={"Admin Orders"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(name="status", in="query", @OA\Schema(type="string")),
-     *     @OA\Response(response=200, description="Thành công")
-     * )
-     */
     public function adminIndex(Request $request)
     {
-        $query = Order::with('user')->orderBy('created_at', 'desc');
+        $query = Order::with(['user', 'items.product'])->orderBy('created_at', 'desc');
 
         if ($request->has('status')) {
             $query->where('order_status', $request->status);
@@ -309,19 +387,9 @@ class OrderController extends Controller
         ]);
     }
 
-    /**
-     * @OA\Get(
-     *     path="/admin/orders/{id}",
-     *     summary="[Admin] Chi tiết đơn hàng",
-     *     tags={"Admin Orders"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer")),
-     *     @OA\Response(response=200, description="Thành công")
-     * )
-     */
     public function adminShow($id)
     {
-        $order = Order::with(['items', 'user', 'coupon'])->findOrFail($id);
+        $order = Order::with(['items.product', 'user', 'coupon'])->findOrFail($id);
 
         return response()->json([
             'success' => true,
@@ -329,23 +397,6 @@ class OrderController extends Controller
         ]);
     }
 
-    /**
-     * @OA\Put(
-     *     path="/admin/orders/{id}/status",
-     *     summary="[Admin] Cập nhật trạng thái đơn hàng",
-     *     tags={"Admin Orders"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer")),
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             @OA\Property(property="order_status", type="string", enum={"pending", "confirmed", "processing", "shipped", "delivered", "cancelled", "returned"}),
-     *             @OA\Property(property="payment_status", type="string", enum={"pending", "paid", "failed"})
-     *         )
-     *     ),
-     *     @OA\Response(response=200, description="Cập nhật thành công")
-     * )
-     */
     public function updateStatus(Request $request, $id)
     {
         $request->validate([
@@ -371,6 +422,19 @@ class OrderController extends Controller
                     if ($item->variant) {
                         $item->variant->increment('stock_quantity', $item->quantity);
                     }
+                    if ($item->product) {
+                        if ($item->product->variants()->count() > 0) {
+                            $totalStock = $item->product->variants()->sum('stock_quantity');
+                            $item->product->update(['stock_quantity' => max(0, $totalStock)]);
+                        } else {
+                            $item->product->increment('stock_quantity', $item->quantity);
+                        }
+                    }
+                }
+
+                // Hoàn lại 1 lượt sử dụng cho Mã giảm giá khi Admin hủy đơn
+                if ($order->coupon_id) {
+                    \App\Models\Coupon::where('id', $order->coupon_id)->where('used_count', '>', 0)->decrement('used_count');
                 }
             }
 

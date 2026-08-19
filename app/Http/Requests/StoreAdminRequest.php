@@ -27,7 +27,7 @@ class StoreAdminRequest extends FormRequest
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:admins,email,NULL,id,deleted_at,NULL',
             'password' => 'required|string|min:8|confirmed',
-            'role' => 'required|string|in:admin,staff,superadmin',
+            'role' => 'required|string|in:admin,staff',
             'is_active' => 'boolean'
         ];
     }
@@ -46,7 +46,7 @@ class StoreAdminRequest extends FormRequest
         return [
             'email.unique' => 'Email này đã được sử dụng.',
             'password.confirmed' => 'Mật khẩu xác nhận không khớp.',
-            'role.in' => 'Role không hợp lệ. Phải là admin, staff hoặc superadmin.',
+            'role.in' => 'Role không hợp lệ. Phải là admin hoặc staff.',
         ];
     }
 }

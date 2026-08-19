@@ -44,6 +44,7 @@
         token: "{{ $token ?? '' }}",
         user: {!! isset($user) ? json_encode($user) : 'null' !!},
         error: "{{ $error ?? '' }}",
+        message: "{{ $message ?? '' }}",
         timestamp: new Date().getTime()
     };
 
@@ -68,7 +69,11 @@
 
         // 3. Đoán xem gọi từ popup hay trực tiếp
         if (messageSent) {
-            document.getElementById('status').innerText = "Đăng nhập thành công! Đang quay lại trang chính...";
+            if (data.error) {
+                document.getElementById('status').innerText = data.message || "Tài khoản của bạn đã bị khóa!";
+            } else {
+                document.getElementById('status').innerText = "Đăng nhập thành công! Đang quay lại trang chính...";
+            }
             setTimeout(() => {
                 window.close();
                 // Nếu sau 1s không tự đóng (do trình duyệt chặn), thì mới redirect
@@ -77,9 +82,9 @@
                         fallbackRedirect();
                     }
                 }, 1000);
-            }, 500);
+            }, 1200);
         } else {
-            document.getElementById('status').innerText = "Đang đồng bộ hóa dữ liệu... vui lòng đợi.";
+            document.getElementById('status').innerText = data.message || "Đang đồng bộ hóa dữ liệu... vui lòng đợi.";
             fallbackRedirect();
         }
     }
@@ -89,6 +94,8 @@
         const frontendUrl = "{!! $frontendUrl ?? config('app.frontend_url', 'https://tttn-2.onrender.com') !!}";
         if (token) {
             window.location.href = frontendUrl.replace(/\/$/, '') + "/?token=" + token;
+        } else if (data.error === 'locked') {
+            window.location.href = frontendUrl.replace(/\/$/, '') + "/login?error=locked";
         } else {
             window.location.href = frontendUrl.replace(/\/$/, '') + "/?error=google_failed";
         }

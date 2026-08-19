@@ -21,6 +21,12 @@ class UpdateProductRequest extends FormRequest
                 'sale_price' => null,
             ]);
         }
+        if ($this->filled('sale_price') && !$this->has('base_price')) {
+            $product = \App\Models\Product::find($this->route('id'));
+            if ($product) {
+                $this->merge(['base_price' => $product->base_price]);
+            }
+        }
     }
 
     public function rules(): array
@@ -33,7 +39,7 @@ class UpdateProductRequest extends FormRequest
             'name' => "sometimes|required|string|max:255|unique:products,name,{$productId}",
             'category_id' => 'sometimes|required|integer|exists:categories,id',
             'base_price' => 'sometimes|required|numeric|min:0',
-            'sale_price' => 'nullable|numeric|min:0',
+            'sale_price' => 'nullable|numeric|lt:base_price|min:0',
             'sku' => "sometimes|required|string|max:100|unique:products,sku,{$productId}",
             'screen_size' => 'nullable|string|max:50',
             'screen_tech' => 'nullable|string|max:100',
@@ -49,11 +55,16 @@ class UpdateProductRequest extends FormRequest
             'description' => 'nullable|string',
             'stock_quantity' => 'sometimes|required|integer|min:0',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:20480',
+            'image_url' => 'nullable|string',
             'gallery_images' => 'nullable|array|max:20',
             'gallery_images.*' => 'image|mimes:jpeg,png,jpg,webp|max:20480',
             'delete_gallery_ids' => 'nullable', // Cho phép JSON string hoặc array từ FormData
             'is_active' => 'boolean',
             'is_featured' => 'boolean',
+            'colors' => 'nullable|array',
+            'colors.*' => 'string',
+            'storages' => 'nullable|array',
+            'storages.*' => 'string',
         ];
     }
 
@@ -73,6 +84,7 @@ class UpdateProductRequest extends FormRequest
             'required' => ':attribute không được để trống khi cập nhật.',
             'unique' => ':attribute này đã được sử dụng.',
             'exists' => ':attribute không hợp lệ.',
+            'sale_price.lt' => 'Giá khuyến mãi phải nhỏ hơn giá gốc.',
             'image.image' => 'File tải lên phải là một hình ảnh.',
             'image.mimes' => 'Hình ảnh phải có định dạng jpeg, png, jpg hoặc webp.',
             'image.max' => 'Ảnh đại diện không được vượt quá 20MB.',

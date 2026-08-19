@@ -12,42 +12,8 @@ use Intervention\Image\ImageManager;
 use Intervention\Image\Drivers\Gd\Driver;
 
 
-/**
- * @OA\Schema(
- *     schema="ProductVariant",
- *     title="ProductVariant",
- *     description="Mô hình Biến thể sản phẩm",
- *     @OA\Property(property="id", type="integer", example=1),
- *     @OA\Property(property="product_id", type="integer", example=1, description="ID của sản phẩm gốc"),
- *     @OA\Property(property="sku", type="string", example="IP15-VAR-001-1", description="Mã kho riêng cho biến thể"),
- *     @OA\Property(property="color", type="string", nullable=true, example="Titanium Tự Nhiên", description="Màu sắc"),
- *     @OA\Property(property="size", type="string", nullable=true, example="256GB", description="Dung lượng bộ nhớ lưu trữ"),
- *     @OA\Property(property="ram", type="string", nullable=true, example="8GB", description="Dung lượng RAM"),
- *     @OA\Property(property="price", type="number", example=34990000, description="Giá riêng của biến thể này"),
- *     @OA\Property(property="stock_quantity", type="integer", example=5, description="Số lượng tồn kho"),
- *     @OA\Property(property="image_url", type="string", nullable=true, description="Ảnh riêng của biến thể"),
- *     @OA\Property(property="is_available", type="boolean", example=true, description="Trạng thái còn hàng (true/false)")
- * )
- */
 class ProductVariantController extends Controller
 {
-    /**
-     * @OA\Get(
-     *     path="/products/{productId}/variants",
-     *     summary="Lấy tất cả biến thể của một sản phẩm",
-     *     tags={"Product Variants"},
-     *     @OA\Parameter(name="productId", in="path", required=true, @OA\Schema(type="integer")),
-     *     @OA\Response(
-     *         response=200, 
-     *         description="Thành công",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/ProductVariant"))
-     *         )
-     *     ),
-     *     @OA\Response(response=404, description="Sản phẩm không tồn tại")
-     * )
-     */
     public function index($productId)
     {
         if (!Product::where('id', $productId)->exists()) {
@@ -58,50 +24,38 @@ class ProductVariantController extends Controller
         return response()->json(['success' => true, 'data' => $variants]);
     }
 
-    /**
-     * @OA\Post(
-     *     path="/products/{productId}/variants",
-     *     summary="Thêm biến thể mới cho sản phẩm (Admin)",
-     *     tags={"Product Variants"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(name="productId", in="path", required=true, @OA\Schema(type="integer")),
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\MediaType(
-     *             mediaType="multipart/form-data",
-     *             @OA\Schema(
-     *                 required={"sku", "price"},
-     *                 @OA\Property(property="sku", type="string", example="IP15-VAR-001-1"),
-     *                 @OA\Property(property="price", type="number", example=34990000),
-     *                 @OA\Property(property="stock_quantity", type="integer", example=5),
-     *                 @OA\Property(property="color", type="string", example="Titanium Tự Nhiên"),
-     *                 @OA\Property(property="size", type="string", example="256GB"),
-     *                 @OA\Property(property="ram", type="string", example="8GB"),
-     *                 @OA\Property(property="is_available", type="integer", enum={0,1}, example=1),
-     *                 @OA\Property(property="image", type="string", format="binary", description="Ảnh riêng của biến thể")
-     *             )
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=201, 
-     *         description="Tạo thành công",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="data", ref="#/components/schemas/ProductVariant")
-     *         )
-     *     ),
-     *     @OA\Response(response=404, description="Sản phẩm không tồn tại"),
-     *     @OA\Response(response=422, description="Dữ liệu không hợp lệ")
-     * )
-     */
     public function store(StoreProductVariantRequest $request, $productId)
     {
-        if (!Product::where('id', $productId)->exists()) {
+        $product = Product::find($productId);
+        if (!$product) {
             return response()->json(['success' => false, 'message' => 'Sản phẩm không tồn tại'], 404);
         }
 
         $validated = $request->validated();
         $validated['product_id'] = $productId;
+        if (empty($validated['price'])) {
+            $validated['price'] = $product->sale_price ?? $product->base_price ?? 0;
+        }
+
+        if (!empty($validated['color'])) {
+            $color = \App\Models\Color::firstOrCreate(['name' => $validated['color']], ['hex_code' => '#000000']);
+            $validated['color_id'] = $color->id;
+        }
+        if (!empty($validated['size']) || !empty($validated['storage'])) {
+            $sVal = $validated['storage'] ?? $validated['size'];
+            $storage = \App\Models\StorageOption::firstOrCreate(['value' => $sVal]);
+            $validated['storage_id'] = $storage->id;
+        }
+        if (!empty($validated['ram'])) {
+            $ram = \App\Models\Ram::firstOrCreate(['value' => $validated['ram']]);
+            $validated['ram_id'] = $ram->id;
+        }
+
+        if (empty($validated['sku'])) {
+            $cSlug = Str::slug($validated['color'] ?? 'def');
+            $sSlug = Str::slug($validated['storage'] ?? $validated['size'] ?? 'def');
+            $validated['sku'] = $product->sku . '-' . $cSlug . '-' . $sSlug . '-' . rand(100, 999);
+        }
 
         if ($request->hasFile('image')) {
             $uploaded = cloudinary()->uploadApi()->upload($request->file('image')->getRealPath(), [
@@ -117,50 +71,19 @@ class ProductVariantController extends Controller
         }
 
         $variant = ProductVariant::create($validated);
+        $variant->load(['color', 'storage', 'ram']);
+
+        // Tự động tính lại và đồng bộ tổng số lượng tồn kho sản phẩm cha
+        $totalStock = ProductVariant::where('product_id', $productId)->sum('stock_quantity');
+        Product::where('id', $productId)->update(['stock_quantity' => $totalStock]);
 
         return response()->json([
             'success' => true,
-            'message' => 'Thêm biến thể thành công!',
+            'message' => 'Thêm biến thể mới thành công!',
             'data' => $variant
         ], 201);
     }
 
-    /**
-     * @OA\Post(
-     *     path="/products/{productId}/variants/{variantId}",
-     *     summary="Cập nhật biến thể sản phẩm (Admin)",
-     *     description="[FE NOTE] Dùng POST thay vì PUT để hỗ trợ upload file. Thêm field `_method = PUT` vào FormData.",
-     *     tags={"Product Variants"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(name="productId", in="path", required=true, @OA\Schema(type="integer")),
-     *     @OA\Parameter(name="variantId", in="path", required=true, @OA\Schema(type="integer")),
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\MediaType(
-     *             mediaType="multipart/form-data",
-     *             @OA\Schema(
-     *                 @OA\Property(property="_method", type="string", example="PUT", description="[BẮT BUỘC] Method Spoofing"),
-     *                 @OA\Property(property="price", type="number", example=20000000),
-     *                 @OA\Property(property="stock_quantity", type="integer", example=10),
-     *                 @OA\Property(property="color", type="string", example="Xám"),
-     *                 @OA\Property(property="is_available", type="integer", enum={0,1}, example=1),
-     *                 @OA\Property(property="image", type="string", format="binary", description="[TÙY CHỌN] Ảnh mới")
-     *             )
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=200, 
-     *         description="Cập nhật thành công",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Cập nhật biến thể thành công!"),
-     *             @OA\Property(property="data", ref="#/components/schemas/ProductVariant")
-     *         )
-     *     ),
-     *     @OA\Response(response=404, description="Biến thể không tồn tại"),
-     *     @OA\Response(response=422, description="Dữ liệu không hợp lệ")
-     * )
-     */
     public function update(UpdateProductVariantRequest $request, $productId, $variantId)
     {
         $variant = ProductVariant::where('product_id', $productId)->find($variantId);
@@ -169,6 +92,20 @@ class ProductVariantController extends Controller
         }
 
         $validated = $request->validated();
+
+        if (!empty($validated['color'])) {
+            $color = \App\Models\Color::firstOrCreate(['name' => $validated['color']], ['hex_code' => '#000000']);
+            $validated['color_id'] = $color->id;
+        }
+        if (!empty($validated['size']) || !empty($validated['storage'])) {
+            $sVal = $validated['storage'] ?? $validated['size'];
+            $storage = \App\Models\StorageOption::firstOrCreate(['value' => $sVal]);
+            $validated['storage_id'] = $storage->id;
+        }
+        if (!empty($validated['ram'])) {
+            $ram = \App\Models\Ram::firstOrCreate(['value' => $validated['ram']]);
+            $validated['ram_id'] = $ram->id;
+        }
 
         if ($request->hasFile('image')) {
             if ($oldUrl = $variant->getRawOriginal('image_url')) {
@@ -196,6 +133,11 @@ class ProductVariantController extends Controller
         }
 
         $variant->update($validated);
+        $variant->load(['color', 'storage', 'ram']);
+
+        // Tự động tính lại và đồng bộ tổng số lượng tồn kho sản phẩm cha
+        $totalStock = ProductVariant::where('product_id', $productId)->sum('stock_quantity');
+        Product::where('id', $productId)->update(['stock_quantity' => $totalStock]);
 
         return response()->json([
             'success' => true,
@@ -204,25 +146,6 @@ class ProductVariantController extends Controller
         ], 200);
     }
 
-    /**
-     * @OA\Delete(
-     *     path="/products/{productId}/variants/{variantId}",
-     *     summary="Xóa biến thể sản phẩm (Admin)",
-     *     tags={"Product Variants"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(name="productId", in="path", required=true, @OA\Schema(type="integer")),
-     *     @OA\Parameter(name="variantId", in="path", required=true, @OA\Schema(type="integer")),
-     *     @OA\Response(
-     *         response=200, 
-     *         description="Xóa thành công",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Đã xóa biến thể thành công!")
-     *         )
-     *     ),
-     *     @OA\Response(response=404, description="Biến thể không tồn tại")
-     * )
-     */
     public function destroy($productId, $variantId)
     {
         $variant = ProductVariant::where('product_id', $productId)->find($variantId);
@@ -245,6 +168,10 @@ class ProductVariantController extends Controller
         }
 
         $variant->delete();
+
+        // Tự động tính lại và đồng bộ tổng số lượng tồn kho sản phẩm cha
+        $totalStock = ProductVariant::where('product_id', $productId)->sum('stock_quantity');
+        Product::where('id', $productId)->update(['stock_quantity' => $totalStock]);
 
         return response()->json([
             'success' => true,

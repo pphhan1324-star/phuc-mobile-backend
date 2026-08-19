@@ -19,11 +19,15 @@ use App\Http\Controllers\RevenueStatsController;
 
 Route::get('/products', [ProductController::class, 'index']);
 Route::get('/products/{id}', [ProductController::class, 'show']);
-// Biến thể: lấy danh sách variant (public - không cần đăng nhập)
-Route::get('/products/{productId}/variants', [ProductVariantController::class, 'index']);
+
+use App\Http\Controllers\ReviewController;
+Route::get('/products/{productId}/reviews', [ReviewController::class, 'index']);
 
 // Danh mục sản phẩm (public)
 Route::get('/categories', [CategoryController::class, 'index']);
+
+// Banners (public)
+Route::get('/banners', [\App\Http\Controllers\BannerController::class, 'index']);
 
 
 use App\Http\Controllers\CartController;
@@ -31,6 +35,7 @@ use App\Http\Controllers\CartController;
 // Public routes (không cần token)
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
+Route::post('/vnpay/create-payment', [\App\Http\Controllers\VNPayController::class, 'createPayment']);
 
 
 
@@ -45,6 +50,7 @@ Route::middleware('auth:api')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
     Route::put('/update-profile', [AuthController::class, 'updateProfile']);
+    Route::post('/change-password', [AuthController::class, 'changePassword']);
 
     // Quản lý địa chỉ
     Route::get('user/addresses', [UserAddressController::class, 'index']);
@@ -62,7 +68,11 @@ Route::middleware('auth:api')->group(function () {
     // Áp dụng mã giảm giá
     Route::post('/coupons/apply', [CouponController::class, 'apply']);
 
+    // Gửi đánh giá
+    Route::post('/products/{productId}/reviews', [ReviewController::class, 'store']);
+
     // Đặt hàng
+    Route::post('/checkout/direct', [OrderController::class, 'checkoutDirect']);
     Route::post('/checkout', [OrderController::class, 'checkout']);
     Route::get('/orders', [OrderController::class, 'index']);
     Route::get('/orders/{id}', [OrderController::class, 'show']);
@@ -82,12 +92,7 @@ Route::middleware('auth:admin-api')->group(function () {
     Route::middleware('role.admin:superadmin')->group(function () {
 
 
-        // Quản lý Staff (Nhân viên/Admins)
-        Route::get('/admin/staff', [AdminController::class, 'index']);
-        Route::post('/admin/staff', [AdminController::class, 'store']);
-        Route::get('/admin/staff/{id}', [AdminController::class, 'show']);
-        Route::put('/admin/staff/{id}', [AdminController::class, 'update']);
-        Route::delete('/admin/staff/{id}', [AdminController::class, 'destroy']);
+
     });
 
     // --- Nhóm quyền: Superadmin & Admin ---
@@ -96,12 +101,13 @@ Route::middleware('auth:admin-api')->group(function () {
         Route::post('/products/create', [ProductController::class, 'store']);
         Route::match(['POST', 'PUT'], '/products/{id}', [ProductController::class, 'update']);
         Route::delete('/products/{id}', [ProductController::class, 'destroy']);
-        Route::patch('/products/{productId}/set-primary-image/{imageId}', [ProductController::class, 'setPrimaryImage']);
 
-        // Product Variants
+        // Quản lý Biến thể sản phẩm (Product Variants)
+        Route::get('/products/{productId}/variants', [ProductVariantController::class, 'index']);
         Route::post('/products/{productId}/variants', [ProductVariantController::class, 'store']);
         Route::match(['POST', 'PUT'], '/products/{productId}/variants/{variantId}', [ProductVariantController::class, 'update']);
         Route::delete('/products/{productId}/variants/{variantId}', [ProductVariantController::class, 'destroy']);
+
 
         // Categories
         Route::post('/categories', [CategoryController::class, 'store']);
@@ -119,11 +125,20 @@ Route::middleware('auth:admin-api')->group(function () {
         Route::delete('/admin/coupons/{coupon}', [CouponController::class, 'destroy']);
 
         // Thống kê sản phẩm (Product Stats)
-        Route::get('/admin/products/stats/by-price', [ProductStatsController::class, 'byPrice']);
         Route::get('/admin/products/stats/by-brand', [ProductStatsController::class, 'byBrand']);
+
+        // Quản lý Đánh giá
+        Route::get('/admin/reviews', [ReviewController::class, 'adminIndex']);
+        Route::delete('/admin/reviews/{id}', [ReviewController::class, 'destroy']);
 
         // Thống kê doanh thu (Revenue Stats)
         Route::get('/admin/revenue/stats', [RevenueStatsController::class, 'stats']);
+
+        // Quản lý Banners
+        Route::get('/admin/banners', [\App\Http\Controllers\BannerController::class, 'adminIndex']);
+        Route::post('/admin/banners', [\App\Http\Controllers\BannerController::class, 'store']);
+        Route::match(['POST', 'PUT'], '/admin/banners/{id}', [\App\Http\Controllers\BannerController::class, 'update']);
+        Route::delete('/admin/banners/{id}', [\App\Http\Controllers\BannerController::class, 'destroy']);
 
     });
 

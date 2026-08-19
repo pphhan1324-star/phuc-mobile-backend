@@ -20,7 +20,7 @@ class UpdateProfileRequest extends FormRequest
             'name' => 'sometimes|required|string|max:100',
             'phone' => 'nullable|string|max:15',
             'gender' => 'nullable|in:male,female,other',
-            'birthday' => 'nullable|date',
+            'birthday' => 'nullable|date|before_or_equal:today',
         ];
     }
 
@@ -39,6 +39,7 @@ class UpdateProfileRequest extends FormRequest
             'in' => 'Giới tính không hợp lệ.',
             'date' => 'Ngày sinh không đúng định dạng ngày tháng.',
             'max' => ':attribute quá dài.',
+            'before_or_equal' => 'Ngày sinh không được là ngày trong tương lai.',
         ];
     }
 

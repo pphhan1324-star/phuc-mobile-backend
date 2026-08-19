@@ -43,7 +43,10 @@ class Coupon extends Model
         }
 
         $now = now()->toDateString();
-        if ($this->start_date > $now || $this->end_date < $now) {
+        $startDate = $this->start_date->toDateString();
+        $endDate = $this->end_date->toDateString();
+
+        if ($startDate > $now || $endDate < $now) {
             return false;
         }
 

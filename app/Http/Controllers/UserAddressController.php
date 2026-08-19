@@ -12,17 +12,7 @@ class UserAddressController extends Controller
 {
 
     /**
-     * @OA\Get(
-     *     path="/user/addresses",
-     *     summary="Lấy danh sách địa chỉ của người dùng đang đăng nhập",
-     *     tags={"User Addresses"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Response(
-     *         response=200,
-     *         description="Thành công",
-     *         @OA\JsonContent(type="array", @OA\Items(ref="#/components/schemas/UserAddress"))
-     *     )
-     * )
+     * Lấy danh sách địa chỉ nhận hàng của User đang đăng nhập.
      */
     public function index()
     {
@@ -31,36 +21,8 @@ class UserAddressController extends Controller
     }
 
     /**
-     * @OA\Post(
-     *     path="/user/addresses",
-     *     summary="Thêm địa chỉ mới",
-     *     tags={"User Addresses"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"receiver_name", "receiver_phone", "province_id", "district_id", "ward_id", "address_detail", "type"},
-     *             @OA\Property(property="receiver_name", type="string", example="Nguyễn Văn A"),
-     *             @OA\Property(property="receiver_phone", type="string", example="0987654321"),
-     *             @OA\Property(property="province_id", type="integer", example=202),
-     *             @OA\Property(property="district_id", type="integer", example=111),
-     *             @OA\Property(property="ward_id", type="integer", example=333),
-     *             @OA\Property(property="address_detail", type="string", example="Số 123, Đường ABC"),
-     *             @OA\Property(property="is_default", type="boolean", example=false),
-     *             @OA\Property(property="type", type="string", enum={"home", "office", "other"}, example="home")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=201, 
-     *         description="Thêm địa chỉ thành công. Nếu đây là địa chỉ đầu tiên, nó sẽ tự động được đặt làm mặc định. Nếu gửi is_default=true, các địa chỉ khác của user sẽ tự động bị bỏ mặc định.",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Thêm địa chỉ thành công"),
-     *             @OA\Property(property="data", ref="#/components/schemas/UserAddress")
-     *         )
-     *     ),
-     *     @OA\Response(response=422, description="Lỗi validation")
-     * )
+     * Thêm địa chỉ mới.
+     * Logic: Nếu là địa chỉ đầu tiên thì tự động set làm mặc định (is_default = true).
      */
     public function store(StoreUserAddressRequest $request)
     {
@@ -85,45 +47,8 @@ class UserAddressController extends Controller
     }
 
     /**
-     * @OA\Put(
-     *     path="/user/addresses/{id}",
-     *     summary="Cập nhật địa chỉ (User)",
-     *     description="Cập nhật thông tin địa chỉ của người dùng đang đăng nhập. Nếu đặt is_default=true, các địa chỉ khác sẽ tự động bỏ mặc định.",
-     *     tags={"User Addresses"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         description="ID của địa chỉ cần cập nhật",
-     *         required=true,
-     *         @OA\Schema(type="integer")
-     *     ),
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             @OA\Property(property="receiver_name", type="string", example="Nguyễn Văn A"),
-     *             @OA\Property(property="receiver_phone", type="string", example="0987654321"),
-     *             @OA\Property(property="province_id", type="integer", example=202),
-     *             @OA\Property(property="district_id", type="integer", example=111),
-     *             @OA\Property(property="ward_id", type="integer", example=333),
-     *             @OA\Property(property="address_detail", type="string", example="Số 123, Đường ABC"),
-     *             @OA\Property(property="is_default", type="boolean", example=true),
-     *             @OA\Property(property="type", type="string", enum={"home", "office", "other"}, example="home")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Cập nhật thành công",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Cập nhật địa chỉ thành công"),
-     *             @OA\Property(property="data", ref="#/components/schemas/UserAddress")
-     *         )
-     *     ),
-     *     @OA\Response(response=401, description="Chưa đăng nhập"),
-     *     @OA\Response(response=404, description="Không tìm thấy địa chỉ"),
-     *     @OA\Response(response=422, description="Lỗi validation dữ liệu")
-     * )
+     * Cập nhật thông tin địa chỉ.
+     * Logic: Nếu tick chọn làm mặc định, tự động gỡ cờ mặc định ở các địa chỉ khác.
      */
     public function update(UpdateUserAddressRequest $request, $id)
     {
@@ -146,14 +71,8 @@ class UserAddressController extends Controller
     }
 
     /**
-     * @OA\Delete(
-     *     path="/user/addresses/{id}",
-     *     summary="Xóa địa chỉ",
-     *     tags={"User Addresses"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer")),
-     *     @OA\Response(response=200, description="Xóa thành công")
-     * )
+     * Xóa địa chỉ.
+     * Logic thông minh: Nếu xóa địa chỉ mặc định, tự động lấy địa chỉ khác (nếu có) lên làm mặc định thay thế.
      */
     public function destroy($id)
     {
@@ -176,16 +95,6 @@ class UserAddressController extends Controller
         ]);
     }
 
-    /**
-     * @OA\Patch(
-     *     path="/user/addresses/{id}/set-default",
-     *     summary="Đặt làm địa chỉ mặc định",
-     *     tags={"User Addresses"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer")),
-     *     @OA\Response(response=200, description="Thành công")
-     * )
-     */
     public function setDefault($id)
     {
         $user = Auth::user();

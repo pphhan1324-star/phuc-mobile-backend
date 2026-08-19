@@ -51,98 +51,8 @@ class RevenueStatsController extends Controller
         return "QUARTER(created_at)";
     }
     /**
-     * @OA\Get(
-     *     path="/admin/revenue/stats",
-     *     summary="Thống kê doanh thu - 4 mode linh hoạt",
-     *     description="Thống kê doanh thu từ đơn hàng đã thanh toán (payment_status=paid).
-     *     
-     *     **Mode 1 - Theo ngày (DAY mode):**
-     *     - GET /admin/revenue/stats?period=day&date=2026-04-07
-     *     - Trả về doanh thu trong ngày, group by giờ
-     *     
-     *     **Mode 2 - Theo tháng (MONTH mode):**
-     *     - GET /admin/revenue/stats?period=month&year=2026&month=4
-     *     - Trả về doanh thu trong tháng 4/2026, group by ngày
-     *     
-     *     **Mode 3 - Theo quý (QUARTER mode):**
-     *     - GET /admin/revenue/stats?period=quarter&year=2026&quarter=2
-     *     - Trả về doanh thu trong quý 2/2026, group by tháng
-     *     
-     *     **Mode 4 - Theo năm (YEAR mode):**
-     *     - GET /admin/revenue/stats?period=year&year=2026
-     *     - Trả về doanh thu trong năm 2026, group by quý",
-     *     operationId="getRevenueStats",
-     *     tags={"Revenue Stats"},
-     *     security={{"bearerAuth":{}}},
-     *
-     *     @OA\Parameter(
-     *         name="period",
-     *         in="query",
-     *         required=true,
-     *         description="Kỳ thống kê: day | month | quarter | year",
-     *         @OA\Schema(type="string", enum={"day", "month", "quarter", "year"}, example="month")
-     *     ),
-     *
-     *     @OA\Parameter(
-     *         name="date",
-     *         in="query",
-     *         required=false,
-     *         description="Bắt buộc khi period=day. Định dạng Y-m-d",
-     *         @OA\Schema(type="string", format="date", example="2026-04-07")
-     *     ),
-     *
-     *     @OA\Parameter(
-     *         name="year",
-     *         in="query",
-     *         required=false,
-     *         description="Bắt buộc khi period=month|quarter|year. Năm cần thống kê",
-     *         @OA\Schema(type="integer", example=2026)
-     *     ),
-     *
-     *     @OA\Parameter(
-     *         name="month",
-     *         in="query",
-     *         required=false,
-     *         description="Bắt buộc khi period=month. Tháng từ 1-12",
-     *         @OA\Schema(type="integer", minimum=1, maximum=12, example=4)
-     *     ),
-     *
-     *     @OA\Parameter(
-     *         name="quarter",
-     *         in="query",
-     *         required=false,
-     *         description="Bắt buộc khi period=quarter. Quý từ 1-4",
-     *         @OA\Schema(type="integer", enum={1,2,3,4}, example=2)
-     *     ),
-     *
-     *     @OA\Response(
-     *         response=200,
-     *         description="Thành công",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="period", type="string", example="month"),
-     *             @OA\Property(property="period_label", type="string", example="Tháng 4/2026"),
-     *             @OA\Property(property="total_revenue", type="number", format="float", example=250000000),
-     *             @OA\Property(property="total_orders", type="integer", example=450),
-     *             @OA\Property(property="average_order_value", type="number", format="float", example=555555.56),
-     *             @OA\Property(
-     *                 property="data",
-     *                 type="array",
-     *                 @OA\Items(
-     *                     type="object",
-     *                     @OA\Property(property="date", type="string", example="2026-04-01"),
-     *                     @OA\Property(property="label", type="string", example="01/04/2026"),
-     *                     @OA\Property(property="revenue", type="number", format="float", example=5000000),
-     *                     @OA\Property(property="order_count", type="integer", example=15),
-     *                     @OA\Property(property="average_order_value", type="number", format="float", example=333333.33)
-     *                 )
-     *             )
-     *         )
-     *     ),
-     *
-     *     @OA\Response(response=422, description="Dữ liệu validation không hợp lệ"),
-     *     @OA\Response(response=401, description="Chưa xác thực")
-     * )
+     * Controller chính xử lý việc báo cáo Doanh thu (Chỉ tính các đơn hàng đã thanh toán - paid).
+     * Gom nhóm dữ liệu theo Ngày, Tháng, Quý, hoặc Năm.
      */
     public function stats(RevenueStatsRequest $request)
     {
@@ -166,8 +76,8 @@ class RevenueStatsController extends Controller
     {
         $date = $request->input('date');
         $dateCarbon = Carbon::createFromFormat('Y-m-d', $date);
-        $startOfDay = $dateCarbon->startOfDay();
-        $endOfDay = $dateCarbon->endOfDay();
+        $startOfDay = $dateCarbon->copy()->startOfDay();
+        $endOfDay = $dateCarbon->copy()->endOfDay();
 
         $query = Order::where('payment_status', 'paid')
             ->whereBetween('created_at', [$startOfDay, $endOfDay]);

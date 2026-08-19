@@ -11,39 +11,7 @@ use App\Models\Product;
 class WishlistController extends Controller
 {
     /**
-     * @OA\Get(
-     *     path="/wishlist",
-     *     summary="Lấy danh sách sản phẩm yêu thích",
-     *     description="Trả về danh sách wishlist của user kèm phân trang. Hỗ trợ tìm kiếm theo tên và lọc theo danh mục.",
-     *     tags={"Wishlist Manager"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(name="search", in="query", required=false, description="Tìm theo tên sản phẩm", @OA\Schema(type="string")),
-     *     @OA\Parameter(name="category_id", in="query", required=false, description="Lọc theo ID danh mục", @OA\Schema(type="integer")),
-     *     @OA\Parameter(name="order", in="query", required=false, description="Thứ tự sắp xếp theo ngày thêm (asc/desc)", @OA\Schema(type="string", enum={"asc", "desc"}, default="desc")),
-     *     @OA\Parameter(name="per_page", in="query", required=false, description="Số bản ghi mỗi trang", @OA\Schema(type="integer", default=10)),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Thành công",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Lấy danh sách yêu thích thành công!"),
-     *             @OA\Property(
-     *                 property="data",
-     *                 type="object",
-     *                 description="Đối tượng phân trang"
-     *             )
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=404,
-     *         description="Không tồn sản phẩm này trong danh sách yêu thích",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Sản phẩm không có trong danh sách yêu thích!")
-     *         )
-     *     ),
-     *     @OA\Response(response=401, description="Unauthorized - Chưa đăng nhập")
-     * )
+     * Lấy danh sách Sản phẩm Yêu thích của User (Có phân trang, tìm kiếm).
      */
     public function index(Request $request)
     {
@@ -79,45 +47,8 @@ class WishlistController extends Controller
 
 
     /**
-     * @OA\Post(
-     *     path="/wishlist/add",
-     *     summary="Thêm sản phẩm vào danh sách yêu thích (Yêu cầu đăng nhập)",
-     *     tags={"Wishlist Manager"},
-     *     security={{"bearerAuth":{}}},
-     *
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"product_id"},
-     *             @OA\Property(
-     *                 property="product_id",
-     *                 type="integer",
-     *                 example=1
-     *             )
-     *         )
-     *     ),
-     *
-     *     @OA\Response(
-     *         response=201,
-     *         description="Thêm vào wishlist thành công (Chống trùng lặp & Chỉ sản phẩm hoạt động)",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Sản phẩm đã được thêm vào danh sách yêu thích thành công!"),
-     *             @OA\Property(
-     *                 property="wishlist",
-     *                 type="object",
-     *                 @OA\Property(property="id", type="integer", example=10),
-     *                 @OA\Property(property="user_id", type="integer", example=2),
-     *                 @OA\Property(property="product_id", type="integer", example=5)
-     *             )
-     *         )
-     *     ),
-     *
-     *     @OA\Response(
-     *         response=401,
-     *         description="Unauthorized - Chưa đăng nhập"
-     *     )
-     * )
+     * Thêm sản phẩm vào danh sách Yêu thích.
+     * Dùng hàm firstOrCreate để chống lỗi: Dù bấm thêm nhiều lần thì chỉ lưu 1 dòng duy nhất.
      */
     public function store(WishlistRequest $request)
     {
@@ -138,34 +69,7 @@ class WishlistController extends Controller
     }
 
     /**
-     * @OA\Delete(
-     *     path="/wishlist/remove/{product_id}",
-     *     summary="Xóa sản phẩm khỏi danh sách yêu thích (Yêu cầu đăng nhập)",
-     *     tags={"Wishlist Manager"},
-     *     security={{"bearerAuth":{}}},
-     *
-     *     @OA\Parameter(
-     *         name="product_id",
-     *         in="path",
-     *         required=true,
-     *         description="ID sản phẩm cần xóa khỏi wishlist",
-     *         @OA\Schema(type="integer", example=5)
-     *     ),
-     *
-     *     @OA\Response(
-     *         response=200,
-     *         description="Xóa thành công",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Đã xóa sản phẩm khỏi danh sách")
-     *         )
-     *     ),
-     *
-     *     @OA\Response(
-     *         response=401,
-     *         description="Unauthorized - Chưa đăng nhập"
-     *     )
-     * )
+     * Bỏ Yêu thích 1 sản phẩm.
      */
     public function remove($id)
     {
@@ -195,24 +99,7 @@ class WishlistController extends Controller
 
 
     /**
-     * @OA\Delete(
-     *     path="/wishlist/clear",
-     *     summary="Xóa toàn bộ danh sách yêu thích (Yêu cầu đăng nhập)",
-     *     tags={"Wishlist Manager"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Response(
-     *         response=200,
-     *         description="Làm trống wishlist thành công",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Đã xóa toàn bộ danh sách")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=401,
-     *         description="Unauthorized"
-     *     )
-     * )
+     * Xóa sạch toàn bộ danh sách Yêu thích của User hiện tại.
      */
     public function clear()
     {

@@ -23,7 +23,7 @@ class CheckAdmin
 
         // 2. Kiểm tra sâu hơn về role
         $admin = Auth::guard('admin-api')->user();
-        if ($admin->role !== 'superadmin' && $admin->role !== 'admin') {
+        if ($admin->role !== 'admin') {
             return response()->json(['message' => 'Cấp bậc của bạn không đủ'], 403);
         }
 
