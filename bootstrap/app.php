@@ -21,12 +21,21 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->redirectGuestsTo(fn($request) => $request->is('api/*') ? null : '/login');
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        $exceptions->render(function (\Illuminate\Auth\AuthenticationException $e, $request) {
+        $exceptions->render(function (\Throwable $e, $request) {
             if ($request->is('api/*')) {
+                if ($e instanceof \Illuminate\Auth\AuthenticationException) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Bạn cần đăng nhập để thực hiện chức năng này.'
+                    ], 401)->header('Access-Control-Allow-Origin', '*');
+                }
+
                 return response()->json([
                     'success' => false,
-                    'message' => 'Bạn cần đăng nhập để thực hiện chức năng này.'
-                ], 401);
+                    'message' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                ], 500)->header('Access-Control-Allow-Origin', '*');
             }
         });
     })->create();
